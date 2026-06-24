@@ -102,10 +102,12 @@ export class HostPlayerModule implements MusicPlayer {
     }
 
     this.innerAudioContext?.destroy();
+    this.currentList = this.store.currentPlaylist;
 
     this.store.setData({
       currentSong: song,
       musicName: song.title,
+      musicArtist: song.artist,
       musicAlbum: song.album,
       musicCover: song.cover_url,
       musicUrl,

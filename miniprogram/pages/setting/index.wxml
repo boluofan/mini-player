@@ -41,6 +41,16 @@
   </view>
 
   <view class="mt-4">
+    <view class="text-xs text-gray-400 uppercase mb-2">播放</view>
+    <view class="bg-white dark:bg-gray-800/20 rounded-xl p-3">
+      <view class="flex justify-between items-center py-2">
+        <text class="text-sm">后台播放</text>
+        <switch class="scale-75" type="checkbox" checked="{{bgAudio}}" bind:change="handleBgAudioChange" />
+      </view>
+    </view>
+  </view>
+
+  <view class="mt-4">
     <view class="text-xs text-gray-400 uppercase mb-2">关于</view>
     <view class="bg-white dark:bg-gray-800/20 rounded-xl p-3">
       <view class="flex justify-between items-center py-2">

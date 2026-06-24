@@ -24,7 +24,10 @@
             <image class="w-5 h-5 p-1 ml-1" src="/assets/icon/gengduo.svg" bind:tap="handleMoreOperation" />
           </view>
         </view>
-        <text class="text-sm opacity-80">{{currentDevice.name}}</text>
+        <view class="flex justify-between items-center">
+          <text class="text-sm opacity-80 flex-1 min-w-0" overflow="ellipsis">{{musicArtist || ''}}</text>
+          <text class="text-sm opacity-60 shrink-0 ml-2">{{currentDevice.name}}</text>
+        </view>
       </view>
 
       <view class="shrink-0 mt-2" bind:tap="handleModeToggle">
@@ -57,7 +60,10 @@
   </view>
 
   <view wx:if="{{mode === 'lyric'}}" class="flex justify-between items-center pb-4">
-    <text class="font-medium text-lg leading-none" overflow="ellipsis">{{musicName || 'Songloft'}}</text>
+    <view class="flex-1 min-w-0">
+      <text class="font-medium text-lg leading-none block" overflow="ellipsis">{{musicName || 'Songloft'}}</text>
+      <text wx:if="{{musicArtist}}" class="text-xs opacity-60 mt-0.5 block" overflow="ellipsis">{{musicArtist}}</text>
+    </view>
     <view wx:if="{{hasMiot && deviceGroups.length}}" class="flex items-center py-1 opacity-80" bind:tap="handleSwitchDevice">
       <text class="text-sm shrink-0">{{currentDevice.name}}</text>
       <image class="w-4 h-4 ml-1 py-0.5 opacity-80" src="/assets/icon/diantai.svg" />

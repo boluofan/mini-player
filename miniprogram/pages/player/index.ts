@@ -25,6 +25,7 @@ ComponentWithStore({
         'status',
         'currentDevice',
         'musicName',
+        'musicArtist',
         'musicCover',
         'primaryColor',
         'playOrder',

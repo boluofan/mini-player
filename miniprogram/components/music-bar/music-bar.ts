@@ -16,6 +16,7 @@ ComponentWithStore({
         'status',
         'currentDevice',
         'musicName',
+        'musicArtist',
         'musicAlbum',
         'musicCover',
         'musicLyricCurrent',

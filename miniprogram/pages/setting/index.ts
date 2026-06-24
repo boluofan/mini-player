@@ -13,6 +13,11 @@ ComponentWithStore({
       fields: ['did', 'hasMiot', 'deviceGroups', 'version'] as const,
       actions: [] as const,
     },
+    {
+      store: store.feature,
+      fields: ['bgAudio'] as const,
+      actions: [] as const,
+    },
   ],
 
   lifetimes: {
@@ -54,6 +59,10 @@ ComponentWithStore({
     handleRestartServer() {
       store.initServer();
       wx.showToast({ title: '已重新初始化', icon: 'none' });
+    },
+
+    handleBgAudioChange(e: any) {
+      store.feature.setBgAudio(e.detail.value);
     },
 
     openLink(e: any) {

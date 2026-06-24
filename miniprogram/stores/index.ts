@@ -41,6 +41,7 @@ export class Store {
   musicName?: string;
   musicCover?: string;
   musicAlbum?: string;
+  musicArtist?: string;
   musicLyric: { time: number; lrc: string }[] = [];
   musicLyricCurrent: { index: number; lrc: string } = { index: 0, lrc: '' };
   musicLyricLoading = false;
