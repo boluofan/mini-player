@@ -13,6 +13,11 @@ ComponentWithStore({
     songs: [] as Song[],
     loading: false,
     isSearch: false,
+    keyword: '',
+    offset: 0,
+    limit: 50,
+    hasMore: true,
+    loadingMore: false,
   },
 
   storeBindings: [
@@ -32,8 +37,8 @@ ComponentWithStore({
   lifetimes: {
     attached() {
       const { search } = this.properties;
-      if (search) {
-        this.setData({ isSearch: true });
+      if (search !== undefined) {
+        this.setData({ isSearch: true, keyword: search });
         this.searchSongs(search);
       } else {
         this.fetchSongs();
@@ -45,22 +50,52 @@ ComponentWithStore({
     async fetchSongs() {
       const { id: playlistId } = this.properties;
       if (!playlistId) return;
-      this.setData({ loading: true });
+      this.setData({ loading: true, offset: 0, songs: [] });
       try {
-        const songs = await store.playlist.fetchSongs(playlistId);
-        this.setData({ songs });
+        const limit = this.data.limit;
+        const songs = await store.playlist.fetchSongs(playlistId, 0, limit);
+        this.setData({ songs, hasMore: songs.length >= limit });
       } finally {
         this.setData({ loading: false });
       }
     },
 
     async searchSongs(keyword: string) {
-      this.setData({ loading: true });
+      this.setData({ loading: true, offset: 0, songs: [] });
       try {
-        const res = await store.playlist.searchSongs(keyword);
-        this.setData({ songs: res });
+        const limit = keyword ? 100 : 1000;
+        const songs = await store.playlist.searchSongs(keyword, 0, limit);
+        this.setData({ songs, hasMore: !!keyword && songs.length >= limit });
       } finally {
         this.setData({ loading: false });
+      }
+    },
+
+    async loadMore() {
+      if (!this.data.hasMore || this.data.loadingMore || this.data.loading)
+        return;
+      const { offset, limit, keyword, isSearch } = this.data;
+      this.setData({ loadingMore: true });
+      try {
+        let newSongs: Song[];
+        if (isSearch) {
+          const newOffset = offset + 100;
+          newSongs = await store.playlist.searchSongs(keyword, newOffset, 100);
+        } else {
+          const newOffset = offset + limit;
+          newSongs = await store.playlist.fetchSongs(
+            this.properties.id!,
+            newOffset,
+            limit,
+          );
+        }
+        this.setData({
+          songs: [...this.data.songs, ...newSongs],
+          offset: isSearch ? offset + 100 : offset + limit,
+          hasMore: newSongs.length >= (isSearch ? 100 : limit),
+        });
+      } finally {
+        this.setData({ loadingMore: false });
       }
     },
 

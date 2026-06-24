@@ -45,8 +45,7 @@ ComponentWithStore({
     },
 
     handleSearch(e: any) {
-      const keyword = e.detail.value;
-      if (!keyword) return;
+      const keyword = e.detail.value || '';
       wx.navigateTo({
         url: `/pages/list/index?search=${encodeURIComponent(keyword)}`,
       });

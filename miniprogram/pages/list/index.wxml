@@ -1,14 +1,14 @@
 <navigation-bar title="{{playlistName}}" />
 
 <scroll-view class="flex-1 overflow-y-hidden px-3 box-border" scroll-y
-  show-scrollbar="{{false}}">
+  show-scrollbar="{{false}}" bind:scrolltolower="loadMore">
 
   <view wx:if="{{loading}}" class="text-sm text-gray-400 text-center py-8">
     加载中...
   </view>
 
   <view wx:elif="{{!songs.length}}" class="text-sm text-gray-400 text-center py-8">
-    歌单为空
+    {{isSearch ? '没有找到相关歌曲' : '歌单为空'}}
   </view>
 
   <view wx:for="{{songs}}" wx:key="id" class="flex items-center p-2.5 border-b border-gray-100 dark:border-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
@@ -22,6 +22,10 @@
       hover-class="bg-gray-200 dark:bg-gray-700 rounded-full">
       <image src="/assets/icon/gengduo.svg" class="w-4 h-4 invert-icon" />
     </view>
+  </view>
+
+  <view wx:if="{{loadingMore}}" class="text-sm text-gray-400 text-center py-4">
+    加载更多...
   </view>
 
 </scroll-view>

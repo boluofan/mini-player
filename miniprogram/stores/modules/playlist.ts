@@ -104,19 +104,39 @@ export class PlaylistModule {
     } catch {}
   }
 
-  async searchSongs(keyword: string): Promise<Song[]> {
+  async searchSongs(keyword: string, offset = 0, limit = 100): Promise<Song[]> {
     try {
-      const res = await request<{ songs: Song[]; total: number }>({
-        url: '/api/v1/songs',
-        data: { keyword: keyword, limit: 100, offset: 0 },
-      });
-      if (res.statusCode !== 200) return [];
-      return (res.data.songs || [])
-        .filter((s) => s.type === 'local' || s.type === 'remote')
-        .map((s) => ({
-          ...s,
-          cover_url: s.cover_url ? buildResourceUrl(s.cover_url) : '',
-        }));
+      if (keyword) {
+        const res = await request<{ songs: Song[]; total: number }>({
+          url: '/api/v1/songs',
+          data: { keyword, offset, limit },
+        });
+        if (res.statusCode !== 200) return [];
+        return (res.data.songs || [])
+          .filter((s) => s.type === 'local' || s.type === 'remote')
+          .map((s) => ({
+            ...s,
+            cover_url: s.cover_url ? buildResourceUrl(s.cover_url) : '',
+          }));
+      }
+      const [localRes, remoteRes] = await Promise.all([
+        request<{ songs: Song[]; total: number }>({
+          url: '/api/v1/songs',
+          data: { type: 'local', limit: 1000, offset: 0 },
+        }),
+        request<{ songs: Song[]; total: number }>({
+          url: '/api/v1/songs',
+          data: { type: 'remote', limit: 1000, offset: 0 },
+        }),
+      ]);
+      const songs = [
+        ...(localRes.statusCode === 200 ? localRes.data.songs || [] : []),
+        ...(remoteRes.statusCode === 200 ? remoteRes.data.songs || [] : []),
+      ];
+      return songs.map((s) => ({
+        ...s,
+        cover_url: s.cover_url ? buildResourceUrl(s.cover_url) : '',
+      }));
     } catch {
       return [];
     }
