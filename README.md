@@ -1,6 +1,6 @@
 ## 菠萝倾听
 
-> [Songloft](https://github.com/boluofan/songloft) 微信小程序客户端，推送本地音乐至小米音箱
+> [Songloft](https://github.com/songloft-org/songloft) 微信小程序客户端，推送本地音乐至小米音箱
 
 基于 [卯卯音乐 (xiaoplayer)](https://github.com/F-loat/xiaoplayer) 二次开发，感谢原作者的开源贡献。
 
@@ -66,4 +66,4 @@ pnpm dev:server
 - [weapp-vite](https://github.com/weapp-vite/weapp-vite)
 - [weapp-tailwindcss](https://github.com/sonofmagic/weapp-tailwindcss)
 - [卯卯音乐 xiaoplayer](https://github.com/F-loat/xiaoplayer)
-- [Songloft](https://github.com/boluofan/songloft)
+- [Songloft](https://github.com/songloft-org/songloft)
