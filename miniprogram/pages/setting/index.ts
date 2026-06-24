@@ -24,7 +24,7 @@ ComponentWithStore({
     attached() {
       store.setData({ showAppBar: false });
       const serverUrl = wx.getStorageSync('songloftServer') || '';
-      this.setData({ serverUrl, version: store.version });
+      this.setData({ serverUrl });
       if (store.hasMiot && !store.deviceGroups.length) {
         store.fetchDevices();
       }

@@ -1,5 +1,5 @@
 import { reaction, makeAutoObservable } from 'mobx-miniprogram';
-import { getImageColor, request, clearAuth, buildResourceUrl } from '../utils';
+import { getImageColor, request } from '../utils';
 import { PlayOrderType, DeviceGroup, DeviceInfo, Song } from '../types';
 import { HostPlayerModule } from './modules/host';
 import { MiotPlayerModule } from './modules/miot';

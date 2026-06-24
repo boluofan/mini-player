@@ -1,5 +1,5 @@
 import { makeAutoObservable, reaction } from 'mobx-miniprogram';
-import { DEFAULT_PRIMARY_COLOR, MusicPlayer, Store } from '..';
+import { MusicPlayer, Store } from '..';
 import { request, buildResourceUrl, sleep } from '@/miniprogram/utils';
 import { Song, PlayerStatus } from '@/miniprogram/types';
 

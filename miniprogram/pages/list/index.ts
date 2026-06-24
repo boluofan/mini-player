@@ -125,7 +125,6 @@ ComponentWithStore({
     },
 
     handleSongOperation(e: any) {
-      const index = e.currentTarget.dataset.index;
       const items = [
         { label: '投放到', value: 'sendTo' },
         { label: '移除歌曲', value: 'remove' },
