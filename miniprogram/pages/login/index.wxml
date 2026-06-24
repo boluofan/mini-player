@@ -1,0 +1,37 @@
+<navigation-bar back="{{false}}" title="连接服务器" />
+
+<scroll-view class="flex-1 overflow-y-hidden px-6 box-border" scroll-y show-scrollbar="{{false}}">
+  <view class="flex flex-col items-center mt-20 mb-8">
+    <image src="/assets/icon/changpian.svg" class="w-24 h-24 opacity-60" />
+    <text class="text-xl mt-4 font-medium text-gray-700 dark:text-gray-200">菠萝倾听</text>
+    <text class="text-sm mt-1 text-gray-400 dark:text-gray-500">菠萝倾听 · Songloft 客户端</text>
+  </view>
+
+  <text wx:if="{{error}}" class="block text-center text-red-500 text-sm mb-3">{{error}}</text>
+
+  <view class="bg-white dark:bg-gray-800/40 rounded-xl overflow-hidden">
+    <view class="flex items-center px-4 py-3 border-b border-gray-100 dark:border-gray-700/50">
+      <text class="text-sm text-gray-500 w-20">服务器地址</text>
+      <input class="flex-1 text-sm ml-2" value="{{serverUrl}}" placeholder="http://192.168.1.100:58091" data-field="serverUrl" bind:input="handleInput" />
+    </view>
+    <view class="flex items-center px-4 py-3 border-b border-gray-100 dark:border-gray-700/50">
+      <text class="text-sm text-gray-500 w-20">用户名</text>
+      <input class="flex-1 text-sm ml-2" value="{{username}}" placeholder="admin" data-field="username" bind:input="handleInput" />
+    </view>
+    <view class="flex items-center px-4 py-3">
+      <text class="text-sm text-gray-500 w-20">密码</text>
+      <input class="flex-1 text-sm ml-2" password="{{!showPassword}}" value="{{password}}" placeholder="admin" data-field="password" bind:input="handleInput" />
+      <image src="/assets/icon/{{showPassword ? 'eye-off' : 'eye'}}.svg" class="w-5 h-5 ml-2 opacity-50" bind:tap="togglePassword" />
+    </view>
+  </view>
+
+  <view class="flex justify-center mt-6">
+    <button class="w-full bg-blue-500 text-white rounded-xl py-3 text-center text-sm font-medium" loading="{{loading}}" disabled="{{loading}}" bind:tap="handleLogin">
+      连接
+    </button>
+  </view>
+
+  <view wx:if="{{savedServerUrl}}" class="mt-4">
+    <text class="text-xs text-gray-400">上次连接：{{savedServerUrl}}</text>
+  </view>
+</scroll-view>

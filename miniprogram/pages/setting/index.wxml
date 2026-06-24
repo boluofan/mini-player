@@ -19,9 +19,23 @@
         <text class="text-sm" wx:if="{{hasMiot}}">已连接</text>
         <text class="text-sm text-gray-500" wx:else>未检测到</text>
       </view>
-      <view class="flex justify-between items-center py-2">
-        <text class="text-sm">当前模式</text>
-        <text class="text-sm">{{did === 'host' ? '本机播放' : '音箱投播'}}</text>
+      <view wx:if="{{hasMiot}}" class="border-t border-gray-100 dark:border-gray-700/50 pt-2 mt-1">
+        <text class="text-xs text-gray-400 mb-2 block">选择播放设备</text>
+        <view class="flex items-center py-2.5 rounded-lg {{did === 'host' ? 'bg-blue-50 dark:bg-blue-900/20' : ''}}" data-deviceid="host" bind:tap="selectDevice">
+          <view class="w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 {{did === 'host' ? 'border-blue-500' : 'border-gray-300'}}">
+            <view wx:if="{{did === 'host'}}" class="w-2.5 h-2.5 rounded-full bg-blue-500"></view>
+          </view>
+          <text class="text-sm {{did === 'host' ? 'text-blue-600 font-medium' : ''}}">📱 本机播放</text>
+        </view>
+        <block wx:for="{{deviceGroups}}" wx:key="account_id">
+          <view class="text-xs text-gray-400 mt-2 mb-1">{{item.account_name || item.account_id}}</view>
+          <view class="flex items-center py-2.5 rounded-lg {{did === item.deviceID ? 'bg-blue-50 dark:bg-blue-900/20' : ''}}" wx:for="{{item.devices}}" wx:for-item="dev" wx:key="deviceID" data-deviceid="{{dev.deviceID}}" data-accountid="{{item.account_id}}" bind:tap="selectDevice">
+            <view class="w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 {{did === dev.deviceID ? 'border-blue-500' : 'border-gray-300'}}">
+              <view wx:if="{{did === dev.deviceID}}" class="w-2.5 h-2.5 rounded-full bg-blue-500"></view>
+            </view>
+            <text class="text-sm {{did === dev.deviceID ? 'text-blue-600 font-medium' : ''}}">🔊 {{dev.name}}</text>
+          </view>
+        </block>
       </view>
     </view>
   </view>

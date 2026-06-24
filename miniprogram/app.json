@@ -3,6 +3,7 @@
     "pages/login/index",
     "pages/index/index",
     "pages/list/index",
+    "pages/list/playing",
     "pages/player/index",
     "pages/setting/index"
   ],

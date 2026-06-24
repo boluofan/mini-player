@@ -67,7 +67,17 @@ ComponentWithStore({
     handleSongTap(e: any) {
       const index = e.currentTarget.dataset.index;
       const song = this.data.songs[index];
-      if (song) store.player.playMusic(song);
+      if (song) {
+        console.log(
+          '[list] handleSongTap - songs count:',
+          this.data.songs.length,
+        );
+        store.setData({ currentPlaylist: this.data.songs });
+        console.log('[list] currentPlaylist set, now playing:', song.title);
+        store.player.playMusic(song);
+      } else {
+        console.log('[list] handleSongTap - no song found at index:', index);
+      }
     },
 
     handleSendToDevice(e: any) {

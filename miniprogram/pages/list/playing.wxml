@@ -1,14 +1,17 @@
-<navigation-bar back half title="{{title || '正在播放'}}" />
+<navigation-bar back half title="播放列表" />
 
-<scroll-view wx:if="{{!!list.length}}" class="flex-1 overflow-y-hidden px-3 box-border" scroll-y type="list" show-scrollbar="{{false}}" bind:scrolltolower="handleLoadMore">
+<scroll-view class="flex-1 overflow-y-hidden px-3 box-border" scroll-y type="list" show-scrollbar="{{false}}">
   <music-item
     wx:for="{{list}}"
-    wx:key="name"
-    title="{{item.name}}"
-    cover="{{item.cover || ''}}"
+    wx:key="id"
+    title="{{item.title}}"
+    cover="{{item.cover_url || ''}}"
     description="{{item.album || ''}}"
-    data-name="{{item.name}}"
-    class="{{item.name === musicName ? 'text-blue-600 dark:text-blue-400' : ''}}"
+    data-index="{{index}}"
+    class="{{currentSong && currentSong.id === item.id ? 'text-green-500' : ''}}"
     bind:tap="handleViewTap"
   />
+  <view wx:if="{{!list.length}}" class="flex items-center justify-center py-10 text-white/40 text-sm">
+    暂无歌曲
+  </view>
 </scroll-view>

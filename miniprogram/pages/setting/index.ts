@@ -10,7 +10,7 @@ ComponentWithStore({
   storeBindings: [
     {
       store,
-      fields: ['did', 'hasMiot', 'version'] as const,
+      fields: ['did', 'hasMiot', 'deviceGroups', 'version'] as const,
       actions: [] as const,
     },
   ],
@@ -20,6 +20,9 @@ ComponentWithStore({
       store.setData({ showAppBar: false });
       const serverUrl = wx.getStorageSync('songloftServer') || '';
       this.setData({ serverUrl, version: store.version });
+      if (store.hasMiot && !store.deviceGroups.length) {
+        store.fetchDevices();
+      }
     },
     detached() {
       store.setData({ showAppBar: true });
@@ -36,6 +39,15 @@ ComponentWithStore({
           wx.removeStorageSync('songloftAuth');
           wx.reLaunch({ url: '/pages/login/index' });
         },
+      });
+    },
+
+    selectDevice(e: any) {
+      const { deviceid, accountid } = e.currentTarget.dataset;
+      store.switchDevice(deviceid, accountid);
+      wx.showToast({
+        title: deviceid === 'host' ? '已切换为本机播放' : '已切换设备',
+        icon: 'none',
       });
     },
 

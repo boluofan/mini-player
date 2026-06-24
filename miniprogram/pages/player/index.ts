@@ -33,6 +33,8 @@ ComponentWithStore({
         'isFavorite',
         'hasMiot',
         'deviceGroups',
+        'currentPlaylist',
+        'currentSong',
       ] as const,
       actions: [] as const,
     },
@@ -180,6 +182,17 @@ ComponentWithStore({
     handleToggleFavorite() {
       const song = store.currentSong;
       if (song) store.favorite.toggleFavorite(song.id);
+    },
+
+    handlePlayingList() {
+      if (!store.currentPlaylist || !store.currentPlaylist.length) {
+        wx.showToast({ title: '暂无播放列表', icon: 'none' });
+        return;
+      }
+      wx.navigateTo({
+        url: '/pages/list/playing',
+        routeType: 'wx://bottom-sheet',
+      });
     },
 
     handleMoreOperation() {

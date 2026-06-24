@@ -170,7 +170,7 @@ export class Store {
         (p: any) => p.entry_path === 'miot' && p.status === 'active',
       );
       this.setData({ hasMiot: !!miot });
-      if (miot && this.did !== 'host') {
+      if (miot) {
         await this.fetchDevices();
       }
     } catch {
@@ -181,12 +181,15 @@ export class Store {
   fetchDevices = async () => {
     if (!this.hasMiot) return;
     try {
-      const res = await request<DeviceGroup[]>({
-        url: '/api/plugin/miot/mina/devices',
+      const res = await request<any>({
+        url: '/api/v1/jsplugin/miot/mina/devices',
       });
       if (res.statusCode !== 200 || !res.data) return;
-      this.setData({ deviceGroups: res.data });
-      const allDevices = (res.data || []).reduce<DeviceInfo[]>(
+      const groups: DeviceGroup[] = Array.isArray(res.data)
+        ? res.data
+        : res.data.groups || res.data.data || [];
+      this.setData({ deviceGroups: groups });
+      const allDevices = groups.reduce<DeviceInfo[]>(
         (acc, g) => acc.concat(g.devices || []),
         [],
       );
@@ -208,7 +211,7 @@ export class Store {
       this.setData({ miotAccountId: accountId });
       try {
         await request({
-          url: '/api/plugin/miot/mina/last_selection',
+          url: '/api/v1/jsplugin/miot/mina/last_selection',
           method: 'POST',
           data: { account_id: accountId, device_id: deviceID },
         });
