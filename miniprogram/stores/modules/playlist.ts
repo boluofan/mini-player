@@ -108,10 +108,15 @@ export class PlaylistModule {
     try {
       const res = await request<{ songs: Song[]; total: number }>({
         url: '/api/v1/songs',
-        data: { q: keyword, limit: 100 },
+        data: { keyword: keyword, limit: 100, offset: 0 },
       });
       if (res.statusCode !== 200) return [];
-      return res.data.songs || [];
+      return (res.data.songs || [])
+        .filter((s) => s.type === 'local' || s.type === 'remote')
+        .map((s) => ({
+          ...s,
+          cover_url: s.cover_url ? buildResourceUrl(s.cover_url) : '',
+        }));
     } catch {
       return [];
     }
