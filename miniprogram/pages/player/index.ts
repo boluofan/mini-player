@@ -1,17 +1,10 @@
 import { ComponentWithStore } from 'mobx-miniprogram-bindings';
 import { DEFAULT_COVER, store } from '../../stores';
 import { GestureState, PlayOrderType } from '../../types';
-import { sleep } from '@/miniprogram/utils';
 
 const progress = wx.worklet.shared(0);
 
 ComponentWithStore({
-  properties: {
-    src: String,
-    name: String,
-    cover: String,
-  },
-
   data: {
     mode: 'cover' as 'cover' | 'lyric',
     statusBarHeight: 0,
@@ -21,7 +14,6 @@ ComponentWithStore({
       [PlayOrderType.Rnd]: 'suijibofang',
       [PlayOrderType.All]: 'liebiaoxunhuan',
     },
-    sharing: null as null | { date: string; lyrics: string[] },
     DEFAULT_COVER,
   },
 
@@ -39,69 +31,37 @@ ComponentWithStore({
         'speed',
         'volume',
         'isFavorite',
+        'hasMiot',
+        'deviceGroups',
       ] as const,
-      actions: [] as const,
-    },
-    {
-      store: store.feature,
-      fields: ['playlist'] as const,
       actions: [] as const,
     },
   ],
 
   lifetimes: {
-    async attached() {
+    attached() {
       const mode = wx.getStorageSync('playerMode');
       const { statusBarHeight, screenHeight } = wx.getWindowInfo();
-
-      this.setData({
-        statusBarHeight,
-        screenHeight,
-        mode: mode || 'cover',
-      });
-
+      this.setData({ statusBarHeight, screenHeight, mode: mode || 'cover' });
       store.setData({ showAppBar: false });
-
-      wx.setKeepScreenOn({
-        keepScreenOn: true,
-      });
+      wx.setKeepScreenOn({ keepScreenOn: true });
     },
     detached() {
       store.setData({ showAppBar: true });
-      wx.setKeepScreenOn({
-        keepScreenOn: false,
-      });
-    },
-  },
-
-  pageLifetimes: {
-    show() {
-      this.setData({ sharing: null });
-      if (!this.properties.src) return;
-      store.setData({
-        did: 'host',
-        musicName: this.properties.name,
-        musicAlbum: '分享',
-        musicUrl: decodeURIComponent(this.properties.src),
-        musicLyric: [],
-      });
-      store.lyric.fetchMusicTag(this.properties.name, '');
+      wx.setKeepScreenOn({ keepScreenOn: false });
     },
   },
 
   methods: {
-    getShareMessage() {
+    onShareAppMessage() {
       return {
         title: store.musicName,
         imageUrl: store.musicCover,
-        path: `/pages/player/index?name=${store.musicName}&src=${encodeURIComponent(store.musicUrl || '')}`,
+        path: `/pages/player/index?name=${encodeURIComponent(store.musicName || '')}&src=${encodeURIComponent(store.musicUrl || '')}`,
       };
     },
-    onShareAppMessage() {
-      return this.getShareMessage();
-    },
     onShareTimeline() {
-      return this.getShareMessage();
+      return this.onShareAppMessage();
     },
 
     handleClose() {
@@ -113,11 +73,7 @@ ComponentWithStore({
       }
     },
 
-    handleGesture(evt: {
-      deltaY: number;
-      velocityY: number;
-      state: GestureState;
-    }) {
+    handleGesture(evt: any) {
       'worklet';
       if (evt.state === GestureState.ACTIVE) {
         progress.value = progress.value + evt.deltaY;
@@ -136,14 +92,8 @@ ComponentWithStore({
     async handlePlayToggle() {
       if (store.status !== 'paused') {
         await store.player.pauseMusic();
-      } else if (this.properties.src) {
-        await store.player.playMusic(
-          store.musicName,
-          store.musicAlbum,
-          store.musicUrl,
-        );
       } else {
-        await store.player.playMusic();
+        await store.player.playMusic(store.currentSong);
       }
     },
 
@@ -154,65 +104,25 @@ ComponentWithStore({
       store.player.playNextMusic();
     },
 
-    handleVolumeChanging(e: {
-      detail: {
-        value: number;
-      };
-    }) {
-      const volume = e.detail.value;
-      wx.showToast({
-        title: `音量 ${volume}`,
-        icon: 'none',
-      });
-    },
-
-    async handleVolumeChange(e: {
-      detail: {
-        value: number;
-      };
-    }) {
+    async handleVolumeChange(e: any) {
       const volume = e.detail.value;
       await store.player.setVolume(volume);
-      wx.showToast({
-        title: `音量已调整为 ${volume}`,
-        icon: 'none',
-      });
+      wx.showToast({ title: `音量 ${volume}`, icon: 'none' });
     },
 
-    handleVolumeUp() {
-      this.handleVolumeChange({
-        detail: {
-          value: Math.min(store.volume + 1, 100),
-        },
-      });
-    },
-
-    handleVolumeDown() {
-      this.handleVolumeChange({
-        detail: {
-          value: Math.max(0, store.volume - 1),
-        },
-      });
-    },
-
-    async handleSwitchOrder() {
-      let cmd = '';
+    handleSwitchOrder() {
       let playOrder = store.playOrder;
       switch (playOrder) {
         case PlayOrderType.One:
-          cmd = '随机播放';
           playOrder = PlayOrderType.Rnd;
           break;
         case PlayOrderType.Rnd:
-          cmd = '全部循环';
           playOrder = PlayOrderType.All;
           break;
         default:
-          cmd = '单曲循环';
           playOrder = PlayOrderType.One;
       }
       store.setData({ playOrder });
-      await store.sendCommand(cmd);
     },
 
     handleSpeed() {
@@ -226,38 +136,33 @@ ComponentWithStore({
         alertText: '倍速播放',
         itemList: items.map((i) => i.label),
         success: (res) => {
-          const { value } = items[res.tapIndex];
-          store.player.setSpeed(value);
+          store.player.setSpeed(items[res.tapIndex].value);
         },
       });
     },
 
-    async handleSwitchDevice() {
-      const items = store.devices
-        .filter((item) => item.did !== store.did)
-        .slice(0, 6);
+    handleSwitchDevice() {
+      if (!store.hasMiot || !store.deviceGroups.length) {
+        wx.showToast({ title: '未检测到可用设备', icon: 'none' });
+        return;
+      }
+      const allDevices = store.deviceList.filter(
+        (d) => d.deviceID !== store.did,
+      );
       wx.showActionSheet({
         alertText: '设备投放',
-        itemList: items.map((i) => String(i.name || i.did)),
+        itemList: allDevices.map((d) => d.name),
         success: async (res) => {
-          const device = items[res.tapIndex];
-          const status = store.status;
-          const album = store.musicAlbum;
-          if (status === 'playing') {
-            await store.player.pauseMusic();
-            await sleep(300);
-          }
-          store.setData({
-            did: device.did,
-          });
-          if (status === 'playing') {
-            await store.player.playMusic(store.musicName, album);
-          }
+          const device = allDevices[res.tapIndex];
+          const account = store.deviceGroups.find((g) =>
+            g.devices.find((d) => d.deviceID === device.deviceID),
+          );
+          await store.switchDevice(device.deviceID, account?.account_id);
         },
       });
     },
 
-    async handleSchedule() {
+    handleSchedule() {
       const items = [
         { label: '10 分钟', value: 10 },
         { label: '30 分钟', value: 30 },
@@ -267,30 +172,22 @@ ComponentWithStore({
         alertText: '定时关闭',
         itemList: items.map((i) => i.label),
         success: (res) => {
-          const { value } = items[res.tapIndex];
-          store.player.setStopAt(value);
+          store.player.setStopAt(items[res.tapIndex].value);
         },
       });
     },
 
     handleToggleFavorite() {
-      store.favorite.toggleFavorite(store.musicName!);
-    },
-
-    handleAddToList() {
-      store.playlist.addToList(store.musicName!);
+      const song = store.currentSong;
+      if (song) store.favorite.toggleFavorite(song.id);
     },
 
     handleMoreOperation() {
       const items = [
         { label: '定时关闭', value: 'schedule' },
         { label: '歌词调整', value: 'lyric' },
-        { label: '歌曲刮削', value: 'scrape' },
         { label: '模式切换', value: 'mode' },
       ];
-      if (this.data.mode === 'lyric') {
-        items.push({ label: '倍速播放', value: 'speed' });
-      }
       wx.showActionSheet({
         alertText: '更多操作',
         itemList: items.map((i) => i.label),
@@ -301,94 +198,30 @@ ComponentWithStore({
               this.handleSchedule();
               break;
             case 'lyric':
-              this.hanldeLyricOffset();
-              break;
-            case 'scrape':
-              this.handleFetchLyric();
+              this.handleLyricOffset();
               break;
             case 'mode':
               this.handleModeToggle();
-              break;
-            case 'speed':
-              this.handleSpeed();
-              break;
-            default:
               break;
           }
         },
       });
     },
 
-    handleFetchLyric() {
-      const cacheKey = `musicInfo:${store.musicName}`;
-      const musicInfo = wx.getStorageSync(cacheKey) || {};
+    handleLyricOffset() {
       wx.showModal({
-        title: '请输入歌手名称 - 歌曲名称',
-        content:
-          musicInfo.name && musicInfo.artist
-            ? `${musicInfo.artist}-${musicInfo.name}`
-            : musicInfo.name || store.musicName,
-        editable: true,
-        confirmText: '搜索歌词',
-        success: (res) => {
-          if (!res.confirm || !res.content) return;
-          const [name, artist] = res.content.split('-').reverse();
-          store.lyric.fetchMusicTag(name, '', artist, true);
-        },
-      });
-    },
-
-    hanldeLyricOffset() {
-      wx.showModal({
-        title: '请输入歌词偏移时长',
+        title: '歌词偏移',
         content: String(store.lyric.offset || ''),
-        placeholderText: '请输入数字',
+        placeholderText: '毫秒',
         editable: true,
         success: (e) => {
           if (!e.confirm) return;
           const offset = parseInt(e.content || '0');
           if (isNaN(offset)) {
-            wx.showToast({
-              title: '请输入数字',
-              icon: 'none',
-            });
+            wx.showToast({ title: '请输入数字', icon: 'none' });
             return;
           }
           store.lyric.setOffset(offset);
-        },
-      });
-    },
-
-    handlePlayingList() {
-      wx.navigateTo({
-        url: `/pages/list/playing?title=${store.musicAlbum}`,
-        routeType: 'wx://bottom-sheet',
-      });
-    },
-
-    handleCopyLink() {
-      if (store.did !== 'host') {
-        wx.showToast({
-          title: '本机播放时可长按复制歌曲链接',
-          icon: 'none',
-        });
-        return;
-      }
-      const { url } = store.hostPlayer.getMusic();
-      if (!url) {
-        wx.showToast({
-          title: '暂无播放中的歌曲',
-          icon: 'none',
-        });
-        return;
-      }
-      wx.setClipboardData({
-        data: url,
-        success: () => {
-          wx.showToast({
-            title: '歌曲链接已复制～',
-            icon: 'none',
-          });
         },
       });
     },

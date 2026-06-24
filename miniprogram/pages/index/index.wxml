@@ -1,4 +1,3 @@
-<!--index.wxml-->
 <template name="setting">
   <navigator slot="right" url="/pages/setting/index"
     class="w-full h-full rounded-full border-[0.5px] border-solid border-black border-opacity-10 box-border flex justify-center items-center bg-white bg-opacity-60 dark:bg-black dark:border-white dark:bg-opacity-10 dark:border-opacity-30" hover-class="bg-gray-200">
@@ -6,74 +5,42 @@
   </navigator>
 </template>
 
-<navigation-bar back="{{false}}" title="卯卯音乐" bind:titletap="handleSwitchDomain">
+<navigation-bar back="{{false}}" title="菠萝倾听">
   <template is="setting" />
 </navigation-bar>
 
-<scroll-view id="scrollview" class="flex-1 overflow-y-hidden px-3 box-border" scroll-y refresher-enabled
-  bind:scrolltolower="handleLoadMore" type="list" show-scrollbar="{{false}}" bind:refresherrefresh="handleRefresh">
-  <search-bar placeholder="请输入关键词" btnText="播放" bind:change="handleFilter" bind:search="handleSearch" bind:playtext="handlePlayText">
+<scroll-view class="flex-1 overflow-y-hidden px-3 box-border" scroll-y refresher-enabled
+  show-scrollbar="{{false}}" bind:refresherrefresh="handleRefresh">
+
+  <search-bar placeholder="搜索歌曲" btnText="搜索" bind:search="handleSearch" bind:playtext="handleSearch">
     <view wx:if="{{isPC}}" class="h-7 w-7 ml-2">
       <template is="setting" />
     </view>
   </search-bar>
 
-  <config
-    wx:if="{{!serverConfig.domain || !connected}}"
-    class="h-3/4"
-    error="{{error}}"
-    bind:refresh="fetchMusicList"
-    bind:switch="handleSwitchDomain"
+  <device-list wx:if="{{hasMiot && deviceGroups.length}}" />
+
+  <view class="text-base font-bold my-3">歌单</view>
+
+  <view wx:if="{{!normalPlaylists.length}}" class="text-sm text-gray-400 text-center py-8">
+    暂无歌单，请先在 Songloft 中扫描音乐
+  </view>
+
+  <music-item
+    wx:for="{{normalPlaylists}}"
+    wx:key="id"
+    title="{{item.name}}"
+    description="{{item.song_count}} 首歌曲"
+    cover="{{item.cover_url || ''}}"
+    data-id="{{item.id}}"
+    data-name="{{item.name}}"
+    bind:tap="handlePlaylistTap"
   />
 
-  <block wx:elif="{{playlists.length}}">
-    <device-list wx:if="{{homeDevices}}" />
-
-    <view class="text-base font-bold my-3">歌单</view>
-
-    <music-item
-      wx:for="{{playlists}}"
-      wx:key="name"
-      title="{{item.name}}"
-      description="{{item.count}} 首歌曲"
-      icon="{{item.icon}}"
-      index="{{index}}"
-      data-name="{{item.name}}"
-      data-type="{{index > 2 ? 'playlist' : 'album'}}"
-      operation="{{index > 2}}"
-      bind:tap="handleViewTap"
-      bind:operation="handleListOperation"
-    />
-
-    <view class="flex items-center w-full p-2.5 rounded-md transition-all text-sm text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800/20" bind:tap="createPlaylist">
-      <image class="w-4 h-4 invert-icon" src="/assets/icon/tianjia.svg" />
-      <view class="ml-2">新建歌单</view>
-    </view>
-
-    <view wx:if="{{list.length}}" class="text-base font-bold my-3">专辑</view>
-
-    <music-item
-      wx:for="{{list}}"
-      wx:key="name"
-      title="{{item.name}}"
-      description="{{item.count}} 首歌曲"
-      cover="{{item.cover || ''}}"
-      data-name="{{item.name}}"
-      bind:tap="handleViewTap"
-    />
-
-    <view wx:if="{{musics.length}}" class="text-base font-bold my-3">歌曲</view>
-
-    <music-item
-      wx:for="{{musics}}"
-      wx:key="*this"
-      title="{{item}}"
-      data-name="{{item}}"
-      bind:tap="handlePlayMusic"
-    />
-  </block>
+  <view class="flex items-center w-full p-2.5 rounded-md transition-all text-sm text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800/20" bind:tap="createPlaylist">
+    <image class="w-4 h-4 invert-icon" src="/assets/icon/tianjia.svg" />
+    <view class="ml-2">新建歌单</view>
+  </view>
 </scroll-view>
 
 <fallback-app-bar />
-
-<radio-player />

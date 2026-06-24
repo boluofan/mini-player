@@ -1,213 +1,128 @@
 import { makeAutoObservable } from 'mobx-miniprogram';
 import { Store } from '..';
-import { getGlobalData, request } from '@/miniprogram/utils';
-
-interface Item {
-  name: string;
-  count: number;
-  icon?: string;
-  music?: string;
-}
-
-const defaultLists = ['最近新增', '收藏', '所有歌曲'];
+import { buildResourceUrl, request } from '@/miniprogram/utils';
+import type { Playlist, Song } from '@/miniprogram/types';
 
 export class PlaylistModule {
   store: Store;
 
-  playlists: Item[] = [];
+  playlists: Playlist[] = [];
 
   constructor(store: Store) {
     this.store = store;
     makeAutoObservable(this);
   }
 
-  get customPlaylists() {
-    return this.playlists.filter((item) => !defaultLists.includes(item.name));
+  get normalPlaylists() {
+    return this.playlists.filter((p) => p.type === 'normal');
   }
 
-  setPlaylists = (lists: Item[]) => {
-    this.playlists = lists.sort((a, b) => {
-      return defaultLists.indexOf(b.name) - defaultLists.indexOf(a.name);
-    });
-  };
+  getPlaylistIdByName(name: string): number {
+    return this.playlists.find((p) => p.name === name)?.id || 0;
+  }
 
   async fetchPlaylists() {
-    if (!this.store.feature.playlist) return defaultLists;
     try {
-      const res = await request<Record<string, string[]>>({
-        url: '/playlistnames',
+      const res = await request<{ playlists: Playlist[]; total: number }>({
+        url: '/api/v1/playlists',
+        data: { limit: 100 },
       });
-      if (res.statusCode !== 200 || !res.data.names) {
-        return defaultLists;
-      }
-      return defaultLists.concat(res.data.names);
+      if (res.statusCode !== 200) return;
+      this.playlists = (res.data.playlists || [])
+        .filter((p) => p.type === 'normal')
+        .map((p) => ({
+          ...p,
+          cover_url: p.cover_url
+            ? buildResourceUrl(p.cover_url)
+            : '/assets/icon/changpian.svg',
+        }));
+    } catch {}
+  }
+
+  async fetchSongs(
+    playlistId: number,
+    offset = 0,
+    limit = 50,
+  ): Promise<Song[]> {
+    try {
+      const res = await request<{ songs: Song[]; total: number }>({
+        url: `/api/v1/playlists/${playlistId}/songs`,
+        data: { offset, limit },
+      });
+      if (res.statusCode !== 200) return [];
+      return (res.data.songs || []).map((s) => ({
+        ...s,
+        cover_url: s.cover_url ? buildResourceUrl(s.cover_url) : '',
+      }));
     } catch {
-      return defaultLists;
+      return [];
     }
   }
 
-  createPlaylist() {
-    if (!this.store.feature.playlist) {
-      wx.showToast({
-        title: 'xiaomusic 版本较低，请更新后使用',
-        icon: 'none',
-      });
+  async createPlaylist(name: string) {
+    const exists = this.playlists.find((p) => p.name === name);
+    if (exists) {
+      wx.showToast({ title: '歌单名称不可重复', icon: 'none' });
       return;
     }
-    wx.showModal({
-      title: '新建歌单',
-      content: '',
-      editable: true,
-      placeholderText: '请输入歌单名称',
-      success: async (res) => {
-        if (!res.confirm || !res.content) return;
-        const oldItem = this.playlists.find(
-          (item) => item.name === res.content,
-        );
-        if (oldItem) {
-          wx.showToast({
-            title: '歌单名称不可重复',
-            icon: 'none',
-          });
-          return;
-        }
-        await request({
-          url: '/playlistadd',
-          method: 'POST',
-          data: {
-            name: res.content,
-          },
-        });
-        this.playlists = this.playlists.concat({
-          name: res.content,
-          count: 0,
-        });
-      },
-    });
+    try {
+      const res = await request<Playlist>({
+        url: '/api/v1/playlists',
+        method: 'POST',
+        data: { type: 'normal', name },
+      });
+      if (res.statusCode === 200) {
+        this.playlists = this.playlists.concat(res.data);
+      }
+    } catch {}
   }
 
-  editPlaylist(name: string, index: number) {
-    wx.showModal({
-      title: '编辑歌单',
-      content: name,
-      editable: true,
-      placeholderText: '请输入歌单名称',
-      success: async (res) => {
-        if (!res.confirm || !res.content) return;
-        const oldItem = this.playlists.find(
-          (item) => item.name === res.content,
-        );
-        if (oldItem) {
-          wx.showToast({
-            title: '歌单名称不可重复',
-            icon: 'none',
-          });
-          return;
-        }
-        await request({
-          url: '/playlistupdatename',
-          method: 'POST',
-          data: {
-            oldname: name,
-            newname: res.content,
-          },
-        });
-        const newList = [...this.playlists];
-        newList[index].name = res.content;
-        this.playlists = newList;
-      },
-    });
-  }
-
-  deletePlaylist(name: string, index: number) {
+  async deletePlaylist(id: number) {
     wx.showModal({
       title: '确认删除',
       content: '仅删除歌单，歌曲文件不会被删除',
       success: async (res) => {
         if (!res.confirm) return;
-        await request({
-          url: '/playlistdel',
-          method: 'POST',
-          data: {
-            name,
-          },
-        });
-        const newList = [...this.playlists];
-        newList.splice(index, 1);
-        this.playlists = newList;
+        try {
+          await request({
+            url: `/api/v1/playlists/${id}`,
+            method: 'DELETE',
+          });
+          this.playlists = this.playlists.filter((p) => p.id !== id);
+        } catch {}
       },
     });
   }
 
-  updatePlaylistCount(name: string, modifer: number) {
-    const newList = [...this.playlists];
-    const index = newList.findIndex((item) => item.name === name);
-
-    if (index === -1) {
-      return;
-    }
-
-    newList[index].count += modifer;
-    this.playlists = newList;
-  }
-
-  addMusic(playlist: string, music: string) {
-    return request({
-      url: '/playlistaddmusic',
-      method: 'POST',
-      data: {
-        name: playlist,
-        music_list: [music],
-      },
-    });
-  }
-
-  removeMusic(playlist: string, music: string) {
-    return request({
-      url: '/playlistdelmusic',
-      method: 'POST',
-      data: {
-        name: playlist,
-        music_list: [music],
-      },
-    });
-  }
-
-  addToList(name: string) {
-    const customLists = this.store.playlist.customPlaylists;
-
-    if (!customLists.length) {
-      wx.showToast({
-        title: '暂无自定义歌单',
-        icon: 'none',
+  async addSongs(playlistId: number, songIds: number[]) {
+    try {
+      await request({
+        url: `/api/v1/playlists/${playlistId}/songs`,
+        method: 'POST',
+        data: { song_ids: songIds },
       });
-      return;
-    }
+    } catch {}
+  }
 
-    if (customLists.length > 6) {
-      wx.showToast({
-        title: '暂只支持至多 6 个自定义歌单',
-        icon: 'none',
+  async searchSongs(keyword: string): Promise<Song[]> {
+    try {
+      const res = await request<{ songs: Song[]; total: number }>({
+        url: '/api/v1/songs',
+        data: { q: keyword, limit: 100 },
       });
-      return;
+      if (res.statusCode !== 200) return [];
+      return res.data.songs || [];
+    } catch {
+      return [];
     }
+  }
 
-    wx.showActionSheet({
-      itemList: customLists.map((item) => item.name),
-      success: async (res) => {
-        const { name: playlist } = customLists[res.tapIndex];
-
-        await this.addMusic(playlist, name);
-        this.updatePlaylistCount(playlist, 1);
-
-        const musiclist = getGlobalData('musiclist');
-        musiclist[playlist]?.push(name);
-
-        wx.showToast({
-          title: '添加成功',
-          icon: 'none',
-        });
-      },
-    });
+  async removeSong(playlistId: number, songId: number) {
+    try {
+      await request({
+        url: `/api/v1/playlists/${playlistId}/songs/${songId}`,
+        method: 'DELETE',
+      });
+    } catch {}
   }
 }

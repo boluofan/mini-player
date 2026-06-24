@@ -1,4 +1,5 @@
 import { store } from './stores';
+import { hasAuth, clearAuth, saveServerUrl } from './utils';
 
 globalThis.global = globalThis;
 
@@ -10,7 +11,16 @@ App<IAppOption>({
     store.player.syncMusic();
   },
   onLaunch() {
-    store.initServer();
+    if (hasAuth()) {
+      store.initServer();
+    } else if (wx.getStorageSync('songloftServer')) {
+      store.initServer().catch(() => {
+        clearAuth();
+        wx.reLaunch({ url: '/pages/login/index' });
+      });
+    } else {
+      wx.reLaunch({ url: '/pages/login/index' });
+    }
   },
   onError(err) {
     console.log('error', err);

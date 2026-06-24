@@ -1,5 +1,107 @@
-import { store } from '../stores';
-import { weBtoa } from './base64';
+import type { AuthTokens } from '@/miniprogram/types';
+
+const STORAGE_KEY_AUTH = 'songloftAuth';
+const STORAGE_KEY_SERVER = 'songloftServer';
+
+let cachedAuth: AuthTokens | null = null;
+let isRefreshing = false;
+let refreshQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (err: any) => void;
+}> = [];
+
+function getServerUrl(): string {
+  return wx.getStorageSync(STORAGE_KEY_SERVER) || '';
+}
+
+function getAuth(): AuthTokens | null {
+  if (cachedAuth) return cachedAuth;
+  const raw = wx.getStorageSync(STORAGE_KEY_AUTH);
+  if (!raw) return null;
+  cachedAuth = raw as AuthTokens;
+  if (cachedAuth.expiresAt < Date.now()) {
+    clearAuth();
+    return null;
+  }
+  return cachedAuth;
+}
+
+export function saveAuth(tokens: AuthTokens) {
+  cachedAuth = tokens;
+  wx.setStorageSync(STORAGE_KEY_AUTH, tokens);
+}
+
+export function clearAuth() {
+  cachedAuth = null;
+  wx.removeStorageSync(STORAGE_KEY_AUTH);
+}
+
+export function saveServerUrl(url: string) {
+  wx.setStorageSync(STORAGE_KEY_SERVER, url.replace(/\/+$/, ''));
+}
+
+export function hasAuth(): boolean {
+  return getAuth() !== null;
+}
+
+async function refreshToken(): Promise<string> {
+  const auth = cachedAuth;
+  if (!auth?.refreshToken) throw new Error('no refresh token');
+
+  const baseUrl = getServerUrl();
+  if (!baseUrl) throw new Error('server not configured');
+
+  const res = await wx.request({
+    url: `${baseUrl}/api/v1/auth/refresh`,
+    method: 'POST',
+    data: { refresh_token: auth.refreshToken },
+    header: { 'content-type': 'application/json' },
+  });
+
+  if (res.statusCode !== 200) {
+    clearAuth();
+    throw new Error('token refresh failed');
+  }
+
+  const data = res.data as any;
+  const newTokens: AuthTokens = {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresAt: Date.now() + (data.expires_in || 604800) * 1000,
+  };
+  saveAuth(newTokens);
+  return newTokens.accessToken;
+}
+
+function getAccessToken(): Promise<string> {
+  const auth = getAuth();
+  if (!auth?.accessToken) return Promise.reject('not authenticated');
+
+  if (auth.expiresAt > Date.now() + 60000) {
+    return Promise.resolve(auth.accessToken);
+  }
+
+  if (isRefreshing) {
+    return new Promise((resolve, reject) => {
+      refreshQueue.push({ resolve, reject });
+    });
+  }
+
+  isRefreshing = true;
+  return refreshToken()
+    .then((token) => {
+      refreshQueue.forEach((q) => q.resolve(token));
+      return token;
+    })
+    .catch((err) => {
+      refreshQueue.forEach((q) => q.reject(err));
+      throw err;
+    })
+    .finally(() => {
+      isRefreshing = false;
+      refreshQueue = [];
+    });
+}
 
 interface RequestParams {
   url: string;
@@ -14,123 +116,77 @@ interface RequestParams {
     | 'CONNECT';
   data?: any;
   timeout?: number;
+  header?: Record<string, string>;
+  noAuth?: boolean;
 }
 
-let cachedCloudInstance: Promise<WxCloud>;
+export const request = <T>({
+  url,
+  method = 'GET',
+  data,
+  timeout = 15000,
+  header = {},
+  noAuth = false,
+}: RequestParams) => {
+  const baseUrl = getServerUrl();
+  if (!baseUrl) return Promise.reject('server not configured');
 
-const getSharedCloudInstance = async () => {
-  const cloud = new wx.cloud.Cloud({
-    resourceAppid: import.meta.env.VITE_CLOUD_RESOURCE_APPID,
-    resourceEnv: import.meta.env.VITE_CLOUD_RESOURCE_ENV,
-  });
-  await cloud.init();
-  return cloud;
-};
+  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
+  const headers: Record<string, string> = { ...header };
 
-const getHostedCloudInstance = () => {
-  const callFunction = ({
-    name,
-    data,
-    method,
-    success,
-    fail,
-    complete,
-  }: {
-    name: string;
-    method?: RequestParams['method'];
-    data: RequestParams & {
-      headers: {
-        Authorization?: string;
-      };
-    };
-    success: (res: any) => void;
-    fail: (err: any) => void;
-    complete: () => void;
-  }) => {
-    wx.request({
-      url: `${import.meta.env.VITE_CLOUD_HOSTED_SERVER}/${name}`,
-      method: method || 'POST',
-      data,
-      success: (res) => {
-        if (res.statusCode !== 200 || res.data?.name === 'Error') {
-          return fail(res.data);
-        }
-        success({ result: res.data });
-      },
-      fail,
-      complete,
-    });
-  };
-  return Promise.resolve({
-    callFunction,
-  }) as Promise<WxCloud>;
-};
-
-export const getCloudInstance = () => {
-  if (cachedCloudInstance) {
-    return cachedCloudInstance;
-  }
-  if (import.meta.env.VITE_CLOUD_ENV) {
-    wx.cloud.init({
-      env: import.meta.env.VITE_CLOUD_ENV,
-    });
-    cachedCloudInstance = Promise.resolve(wx.cloud);
-    return cachedCloudInstance;
-  } else if (import.meta.env.VITE_CLOUD_RESOURCE_ENV) {
-    cachedCloudInstance = getSharedCloudInstance();
-  } else if (import.meta.env.VITE_CLOUD_HOSTED_SERVER) {
-    cachedCloudInstance = getHostedCloudInstance();
-  } else {
-    throw new Error('服务配置缺失');
-  }
-  return cachedCloudInstance;
-};
-
-export const request = <T>({ url, method, data, timeout }: RequestParams) => {
-  const header: {
-    Authorization?: string;
-  } = {};
-  const serverConfig = store
-    ? store.serverConfig
-    : wx.getStorageSync('serverConfig');
-  const { domain, privateDomain, auth, username, password } =
-    serverConfig || {};
-  if (!domain) return Promise.reject('domain error');
-  if (auth && username && password) {
-    header.Authorization = `Basic ${weBtoa(username + ':' + password)}`;
-  }
-  return new Promise<{ data: T; statusCode: number }>(
+  return new Promise<{ data: T; statusCode: number; header: any }>(
     async (resolve, reject) => {
-      const prefix = domain.startsWith('http') ? '' : 'http://';
-      const options = {
-        url: `${prefix}${domain}${url}`,
-        method,
-        data,
-        timeout,
-      };
-      if (domain === privateDomain) {
+      try {
+        if (!noAuth) {
+          const token = await getAccessToken();
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        if (data && method !== 'GET') {
+          headers['content-type'] = 'application/json';
+        }
+
         wx.request({
-          ...options,
-          header,
-          success: resolve,
-          fail: reject,
-        });
-      } else {
-        const cloud = await getCloudInstance();
-        cloud.callFunction({
-          name: 'proxy',
-          data: {
-            ...options,
-            headers: header,
-          },
-          success: (res) =>
+          url: fullUrl,
+          method,
+          data,
+          header: headers,
+          timeout,
+          success: (res) => {
+            if (res.statusCode === 401 && !noAuth) {
+              clearAuth();
+              const pages = getCurrentPages();
+              const page = pages[pages.length - 1];
+              if (page?.route !== 'pages/login/index') {
+                wx.reLaunch({ url: '/pages/login/index' });
+              }
+              reject(new Error('unauthorized'));
+              return;
+            }
             resolve({
-              data: res.result as T,
-              statusCode: 200,
-            }),
+              data: res.data as T,
+              statusCode: res.statusCode,
+              header: res.header,
+            });
+          },
           fail: reject,
         });
+      } catch (err) {
+        reject(err);
       }
     },
   );
 };
+
+export function getServerBaseUrl(): string {
+  return getServerUrl();
+}
+
+export function buildResourceUrl(path: string): string {
+  const baseUrl = getServerUrl();
+  if (!baseUrl || !path) return '';
+  const auth = getAuth();
+  if (!auth) return `${baseUrl}${path}`;
+  const sep = path.includes('?') ? '&' : '?';
+  return `${baseUrl}${path}${sep}access_token=${auth.accessToken}`;
+}

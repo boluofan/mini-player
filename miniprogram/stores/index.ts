@@ -1,19 +1,15 @@
 import { reaction, makeAutoObservable } from 'mobx-miniprogram';
-import { getImageColor, removeProtocol, request } from '../utils';
-import { Device, PlayOrderType, ServerConfig } from '../types';
+import { getImageColor, request, clearAuth, buildResourceUrl } from '../utils';
+import { PlayOrderType, DeviceGroup, DeviceInfo, Song } from '../types';
 import { HostPlayerModule } from './modules/host';
-import { XiaomusicPlayerModule } from './modules/xiaomusic';
+import { MiotPlayerModule } from './modules/miot';
 import { FavoriteModule } from './modules/favorite';
 import { LyricModule } from './modules/lyric';
 import { FeatureModule } from './modules/feature';
 import { PlaylistModule } from './modules/playlist';
-import { InfoModule } from './modules/info';
 
 const { platform } = wx.getDeviceInfo();
 
-export const SLOGAN = '无限听歌，解放小爱音箱';
-export const SHARE_COVER =
-  'https://assets-1251785959.cos.ap-beijing.myqcloud.com/xiaoplayer/cover.png';
 export const DEFAULT_COVER = '/assets/icon/changpian.svg';
 export const DEFAULT_PRIMARY_COLOR = '#7e7a91';
 
@@ -24,7 +20,7 @@ export interface MusicPlayer {
   setStopAt: (minute: number) => void;
   setVolume: (volume: number) => Promise<any> | void;
   getMusic: () => { url?: string };
-  playMusic: (name?: string, album?: string) => Promise<void>;
+  playMusic: (song?: Song, playlist?: Song[]) => Promise<void>;
   pauseMusic(): Promise<void>;
   syncMusic: () => Promise<void>;
   seekMusic: (time: number) => Promise<void>;
@@ -38,6 +34,9 @@ export class Store {
   status: 'paused' | 'loading' | 'playing' = 'paused';
 
   primaryColor: string = DEFAULT_PRIMARY_COLOR;
+
+  currentSong?: Song;
+  currentPlaylist: Song[] = [];
 
   musicName?: string;
   musicCover?: string;
@@ -54,37 +53,36 @@ export class Store {
   playTimer: number | null = null;
 
   showAppBar = true;
-  version: null | string = wx.getStorageSync('serverVersion') || null;
+  version: string | null = wx.getStorageSync('serverVersion') || null;
+  hasMiot = false;
+  miotAccountId: string = '';
 
-  devices: Device[] = [];
+  deviceGroups: DeviceGroup[] = [];
 
   isPC =
     platform !== 'ohos' &&
     (platform === 'windows' ||
       platform === 'mac' ||
       !wx.getSkylineInfoSync?.().isSupported);
-  serverConfig: ServerConfig = wx.getStorageSync('serverConfig') || {};
 
-  info: InfoModule;
   lyric: LyricModule;
   feature: FeatureModule;
   favorite: FavoriteModule;
   playlist: PlaylistModule;
   hostPlayer: HostPlayerModule;
-  xiaomusicPlayer: XiaomusicPlayerModule;
+  miotPlayer: MiotPlayerModule;
 
   colorsMap = new Map<string, string>();
 
   constructor() {
     makeAutoObservable(this);
 
-    this.info = new InfoModule(this);
     this.lyric = new LyricModule(this);
     this.feature = new FeatureModule(this);
     this.favorite = new FavoriteModule(this);
     this.playlist = new PlaylistModule(this);
     this.hostPlayer = new HostPlayerModule(this);
-    this.xiaomusicPlayer = new XiaomusicPlayerModule(this);
+    this.miotPlayer = new MiotPlayerModule(this);
 
     reaction(
       () => this.did,
@@ -94,23 +92,11 @@ export class Store {
       () => this.musicCover,
       () => this.updateColor(),
     );
-    reaction(
-      () => this.musicName,
-      () => {
-        if (this.deviceIndex === -1) return;
-        const newDevices = [...this.devices];
-        newDevices[this.deviceIndex].cur_music = this.musicName;
-        this.devices = newDevices;
-      },
-    );
-  }
-
-  get isM3U8() {
-    return this.musicUrl?.split('?')[0].endsWith('m3u8');
   }
 
   get player() {
-    return this.did === 'host' ? this.hostPlayer : this.xiaomusicPlayer;
+    if (this.did === 'host' || !this.hasMiot) return this.hostPlayer;
+    return this.miotPlayer;
   }
 
   get speed() {
@@ -122,25 +108,26 @@ export class Store {
   }
 
   get isFavorite() {
-    return this.musicName && this.favorite.isFavorite(this.musicName);
+    return this.currentSong
+      ? this.favorite.isFavorite(this.currentSong.id)
+      : false;
   }
 
-  get deviceIndex() {
-    return this.devices.findIndex((item) => item.did === this.did);
+  get deviceList() {
+    return (this.deviceGroups || []).reduce<DeviceInfo[]>(
+      (acc, g) => acc.concat(g.devices || []),
+      [],
+    );
   }
 
   get currentDevice() {
-    return this.devices[this.deviceIndex] || { name: '本机', cur_music: '' };
+    if (this.did === 'host') return { name: '本机', deviceID: 'host' };
+    const dev = this.deviceList.find((d) => d.deviceID === this.did);
+    return dev || { name: '音箱', deviceID: this.did };
   }
 
   setData = (values: any) => {
     Object.assign(this, values);
-  };
-
-  updateServerConfig = async (config: ServerConfig) => {
-    this.serverConfig = config;
-    wx.setStorageSync('serverConfig', config);
-    await store.initServer();
   };
 
   async updateColor() {
@@ -157,109 +144,76 @@ export class Store {
 
   initServer = async () => {
     try {
-      const res = await request<{
-        detail?: string;
-        devices: Record<string, Device>;
-      }>({
-        url: '/getsetting',
+      const res = await request<{ version: string; git_commit?: string }>({
+        url: '/api/v1/version',
       });
-      console.info('@@@ settings', res.data);
+      if (res.statusCode !== 200) return;
 
-      if (res.statusCode !== 200) {
-        if (res.statusCode === 401) {
-          throw new Error('Request failed with status code 401');
-        }
-        return;
-      }
+      const version = res.data.version;
+      this.setData({ version });
+      wx.setStorageSync('serverVersion', version);
 
-      const cachedHost = wx.getStorageSync('hostMusicInfo') || {};
-      const host: Device = {
-        name: '本机',
-        did: 'host',
-        hardware: '本机',
-        cur_music: this.did === 'host' ? store.musicName : cachedHost.name,
-        cur_playlist: this.did === 'host' ? store.musicAlbum : cachedHost.album,
-      };
-      const devices = [host].concat(Object.values(res.data.devices || {}));
-
-      if (this.did !== 'host') {
-        const playOrder = res.data.devices?.[this.did]?.play_type;
-        this.setData({ playOrder: playOrder ?? PlayOrderType.All });
-      }
-
-      this.setData({ devices });
-
-      if (devices.length <= 1 && !wx.getStorageSync('disableDeviceTip')) {
-        wx.showModal({
-          title: '无可用设备',
-          content: '未发现可用设备，仅可使用本机播放',
-          cancelText: '不再提醒',
-          confirmText: '前往配置',
-          success(res) {
-            if (res.confirm) {
-              wx.navigateTo({
-                url: '/pages/setting/more',
-              });
-            } else if (res.cancel) {
-              wx.setStorageSync('disableDeviceTip', true);
-            }
-          },
-        });
-      }
-
-      const { data } = await request<{
-        version: string;
-      }>({
-        url: '/getversion',
-      });
-
-      if (!data.version) {
-        return;
-      }
-
-      this.setData({
-        version: data.version,
-      });
-      wx.setStorageSync('serverVersion', data.version);
-    } catch (err: any) {
-      if (err.message?.includes(401)) {
-        wx.showModal({
-          title: '鉴权失败',
-          content: '请确认账号密码是否配置正确',
-          success: (res) => {
-            if (!res.confirm) return;
-            wx.navigateTo({
-              url: '/pages/setting/index',
-            });
-          },
-        });
-      }
-      console.error(err);
+      await this.detectMiotPlugin();
+      await this.playlist.fetchPlaylists();
+    } catch (err) {
+      console.error('initServer error', err);
     }
   };
 
-  getResourceUrl(url?: string) {
-    if (!url) return '';
-    const { domain, publicDomain = '', privateDomain } = this.serverConfig;
-    const protocol = publicDomain.match(/(.*):\/\//)?.[1] || 'http';
-    return domain === publicDomain && privateDomain
-      ? `${protocol}://${removeProtocol(url).replace(
-          removeProtocol(privateDomain),
-          removeProtocol(publicDomain),
-        )}`
-      : url;
-  }
+  detectMiotPlugin = async () => {
+    try {
+      const res = await request<{ plugins: any[] }>({
+        url: '/api/v1/jsplugins',
+      });
+      if (res.statusCode !== 200) return;
+      const miot = res.data.plugins?.find(
+        (p: any) => p.entry_path === 'miot' && p.status === 'active',
+      );
+      this.setData({ hasMiot: !!miot });
+      if (miot && this.did !== 'host') {
+        await this.fetchDevices();
+      }
+    } catch {
+      this.setData({ hasMiot: false });
+    }
+  };
 
-  sendCommand = (cmd: String, did: string | null = this.did) => {
-    if (did === 'host') return;
-    return request({
-      url: '/cmd',
-      method: 'POST',
-      data: {
-        cmd,
-        did,
-      },
-    });
+  fetchDevices = async () => {
+    if (!this.hasMiot) return;
+    try {
+      const res = await request<DeviceGroup[]>({
+        url: '/api/plugin/miot/mina/devices',
+      });
+      if (res.statusCode !== 200 || !res.data) return;
+      this.setData({ deviceGroups: res.data });
+      const allDevices = (res.data || []).reduce<DeviceInfo[]>(
+        (acc, g) => acc.concat(g.devices || []),
+        [],
+      );
+      if (
+        this.did !== 'host' &&
+        !allDevices.find((d) => d.deviceID === this.did)
+      ) {
+        this.setData({ did: 'host' });
+      }
+    } catch (err) {
+      console.error('fetchDevices error', err);
+    }
+  };
+
+  switchDevice = async (deviceID: string, accountId?: string) => {
+    this.setData({ did: deviceID });
+    if (deviceID === 'host') return;
+    if (this.hasMiot && accountId) {
+      this.setData({ miotAccountId: accountId });
+      try {
+        await request({
+          url: '/api/plugin/miot/mina/last_selection',
+          method: 'POST',
+          data: { account_id: accountId, device_id: deviceID },
+        });
+      } catch {}
+    }
   };
 
   updateCurrentTime = () => {

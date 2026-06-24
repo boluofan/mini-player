@@ -1,55 +1,47 @@
-<!--index.wxml-->
-<navigation-bar back title="配置" />
+<navigation-bar title="设置" />
 
-<text wx:if="{{notice.text}}"  class="px-2 py-1 mb-2 bg-[#fcf6ed] text-[#de8c17] dark:bg-opacity-40 dark:text-white text-xs truncate" bind:tap="handleNotice">{{notice.text}}</text>
+<scroll-view class="flex-1 overflow-y-hidden px-3 box-border" scroll-y show-scrollbar="{{false}}">
+  <view class="mt-4">
+    <view class="text-xs text-gray-400 uppercase mb-2">服务器</view>
+    <view class="bg-white dark:bg-gray-800/20 rounded-xl p-3">
+      <view class="flex justify-between items-center py-2">
+        <text class="text-sm">服务器地址</text>
+        <text class="text-sm text-gray-500 truncate max-w-[200px]">{{serverUrl}}</text>
+      </view>
+    </view>
+  </view>
 
-<scroll-view class="flex-1 overflow-y-hidden px-4 box-border" scroll-y show-scrollbar="{{false}}">
-  <xiao-cell>
-		<view>内网服务地址</view>
-		<input class="flex-1 ml-2 -mb-1" value="{{serverConfig.privateDomain}}" placeholder="请输入" data-name="privateDomain" bind:input="handleFormChange"></input>
-	</xiao-cell>
-	<xiao-cell>
-		<view>公网服务地址</view>
-		<input class="flex-1 ml-2 -mb-1" value="{{serverConfig.publicDomain}}"  placeholder="请输入" data-name="publicDomain" bind:input="handleFormChange"></input>
-	</xiao-cell>
-	<xiao-cell extClass="justify-between">
-		<view>控制台密码验证</view>
-		<switch class="scale-75" type="checkbox" checked="{{serverConfig.auth}}" data-name="auth" bind:change="handleFormChange" />
-	</xiao-cell>
-	<block wx:if="{{serverConfig.auth}}">
-		<xiao-cell>
-			<view>控制台账户</view>
-			<input class="flex-1 ml-2 -mb-1" value="{{serverConfig.username}}" placeholder="请输入" data-name="username" bind:input="handleFormChange"></input>
-		</xiao-cell>
-		<xiao-cell>
-			<view>控制台密码</view>
-			<input class="flex-1 ml-2 -mb-1" password value="{{serverConfig.password}}" placeholder="请输入" data-name="password" bind:input="handleFormChange"></input>
-		</xiao-cell>
-	</block>
-	<view class="flex justify-center mb-3">
-		<button open-type="share" class="bg-white dark:bg-gray-800/40">分享配置</button>
-		<button style="margin-left: 12px" class="bg-blue-500/80 dark:bg-blue-500/60 text-white" bind:tap="handleSaveConfig">保存配置</button>
-		<button style="margin-left: 12px; width: 144rpx;" class="flex items-center justify-center p-0 bg-white dark:bg-gray-800/40" bind:tap="navigateToMore">
-			<image class="w-4 h-4 invert-icon" src="/assets/icon/gengduoshezhi.svg" />
-		</button>
-	</view>
-	<xiao-cell extClass="justify-between">
-		<view>首页设备</view>
-		<switch class="scale-75" type="checkbox" checked="{{homeDevices}}"  bind:change="handleHomeDevicesChange" />
-	</xiao-cell>
-	<xiao-cell extClass="justify-between">
-		<view>逐字歌词</view>
-		<switch class="scale-75" type="checkbox" checked="{{advanceLyric}}"  bind:change="handleAdvanceLyricChange" />
-	</xiao-cell>
-	<xiao-cell extClass="justify-between">
-		<view>后台播放</view>
-		<switch class="scale-75" type="checkbox" checked="{{bgAudio}}"  bind:change="handleBgAudioChange" />
-	</xiao-cell>
-	<xiao-cell wx:if="{{schedule}}" bind:tap="navigateToSchedule" extClass="justify-between">
-		<view>定时播放</view>
-		<image class="w-4 h-4 mr-2.5 invert-icon" src="/assets/icon/jiantou.svg" />
-	</xiao-cell>
-	<ad-custom wx:if="{{ADUnitId && ad && version}}" unit-id="{{ADUnitId}}" />
-	<device-list wx:if="{{!homeDevices}}" />
-	<github-link title="F-loat/xiaoplayer" link="https://github.com/F-loat/xiaoplayer" />
+  <view class="mt-4">
+    <view class="text-xs text-gray-400 uppercase mb-2">设备</view>
+    <view class="bg-white dark:bg-gray-800/20 rounded-xl p-3">
+      <view class="flex justify-between items-center py-2">
+        <text class="text-sm">Miot 插件</text>
+        <text class="text-sm" wx:if="{{hasMiot}}">已连接</text>
+        <text class="text-sm text-gray-500" wx:else>未检测到</text>
+      </view>
+      <view class="flex justify-between items-center py-2">
+        <text class="text-sm">当前模式</text>
+        <text class="text-sm">{{did === 'host' ? '本机播放' : '音箱投播'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="mt-4">
+    <view class="text-xs text-gray-400 uppercase mb-2">关于</view>
+    <view class="bg-white dark:bg-gray-800/20 rounded-xl p-3">
+      <view class="flex justify-between items-center py-2">
+        <text class="text-sm">版本</text>
+        <text class="text-sm text-gray-500">{{version}}</text>
+      </view>
+      <view class="flex items-center py-2 border-t border-gray-100 dark:border-gray-700/50">
+        <text class="text-sm text-gray-400">基于 卯卯音乐 二次开发</text>
+        <text class="text-sm ml-1 text-blue-500" data-url="https://github.com/F-loat/xiaoplayer" bind:tap="openLink">GitHub</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="mt-8 flex flex-col gap-3">
+    <button class="w-full py-2.5 rounded-lg text-sm text-white bg-red-500" bind:tap="handleLogout">退出登录</button>
+    <button class="w-full py-2.5 rounded-lg text-sm text-gray-500 bg-white dark:bg-gray-800/20" bind:tap="handleRestartServer">重新初始化服务器</button>
+  </view>
 </scroll-view>

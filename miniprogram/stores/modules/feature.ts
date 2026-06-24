@@ -1,69 +1,25 @@
 import { makeAutoObservable, reaction } from 'mobx-miniprogram';
 import { Store } from '..';
-import { compareVersions } from 'compare-versions';
 
 export class FeatureModule {
   store: Store;
 
-  homeDevices: boolean; // 首页设备
-  advanceLyric: boolean; // 逐字歌词
-  bgAudio: boolean; // 后台播放
-  ad: boolean; // 小程序内广告
-
-  musicTags: boolean = true; // 歌曲标签获取
-  musicInfos: boolean = true; // 歌曲封面批量获取
-  musicScrape: boolean = false; // 歌曲标签刮削
-  playlist: boolean = false; // 自定义歌单
-  renamePlaylist: boolean = false; // 重命名自定义歌单
-  playText: boolean = false; // 播放文字
-  playApi: boolean = false; // 播放专用接口
-  schedule: boolean = false; // 定时播放
-  scheduleHolidays: boolean = false; // 节假日定时播放
+  advanceLyric: boolean;
+  bgAudio: boolean;
 
   constructor(store: Store) {
     this.store = store;
     makeAutoObservable(this);
 
-    const featureInfo = wx.getStorageSync('featureInfo') || {};
-    this.homeDevices = featureInfo.homeDevices ?? true;
-    this.advanceLyric = featureInfo.advanceLyric ?? true;
-    this.bgAudio = featureInfo.bgAudio ?? true;
-    this.ad = featureInfo.ad ?? true;
+    const info = wx.getStorageSync('featureInfo') || {};
+    this.advanceLyric = info.advanceLyric ?? true;
+    this.bgAudio = info.bgAudio ?? true;
 
     reaction(
-      () => ({
-        homeDevices: this.homeDevices,
-        advanceLyric: this.advanceLyric,
-        bgAudio: this.bgAudio,
-        ad: this.ad,
-      }),
+      () => ({ advanceLyric: this.advanceLyric, bgAudio: this.bgAudio }),
       (val) => wx.setStorageSync('featureInfo', val),
-      {
-        delay: 1000,
-      },
+      { delay: 1000 },
     );
-    reaction(
-      () => store.version,
-      (version) => {
-        if (!version) return;
-        this.musicTags = compareVersions(version, '0.3.37') >= 0;
-        this.musicInfos = compareVersions(version, '0.3.38') >= 0;
-        this.musicScrape = compareVersions(version, '0.3.56') >= 0;
-        this.playlist = compareVersions(version, '0.3.59') >= 0;
-        this.renamePlaylist = compareVersions(version, '0.3.65') >= 0;
-        this.playText = compareVersions(version, '0.3.72') >= 0;
-        this.playApi = compareVersions(version, '0.3.50') >= 0;
-        this.schedule = compareVersions(version, '0.3.38') >= 0;
-        this.scheduleHolidays = compareVersions(version, '0.3.81') >= 0;
-      },
-      {
-        fireImmediately: true,
-      },
-    );
-  }
-
-  setHomeDevices(value: boolean) {
-    this.homeDevices = value;
   }
 
   setAdvanceLyric(value: boolean) {
@@ -73,9 +29,5 @@ export class FeatureModule {
   setBgAudio(value: boolean) {
     this.bgAudio = value;
     this.store.hostPlayer.audioContext?.stop();
-  }
-
-  setAd(value: boolean) {
-    this.ad = value;
   }
 }

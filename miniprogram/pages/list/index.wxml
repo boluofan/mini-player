@@ -1,22 +1,27 @@
-<navigation-bar back title="{{title || name}}" />
+<navigation-bar title="{{playlistName}}" />
 
-<scroll-view class="flex-1 overflow-y-hidden px-3 box-border" scroll-y type="list"
-  show-scrollbar="{{false}}" bind:scrolltolower="handleLoadMore">
-  <view class="mb-3">
-    <search-bar placeholder="请输入关键词" bind:change="handleFilter" />
+<scroll-view class="flex-1 overflow-y-hidden px-3 box-border" scroll-y
+  show-scrollbar="{{false}}">
+
+  <view wx:if="{{loading}}" class="text-sm text-gray-400 text-center py-8">
+    加载中...
   </view>
-  <music-item
-    wx:for="{{list}}"
-    wx:key="name"
-    title="{{item.name}}"
-    cover="{{item.cover || ''}}"
-    description="{{item.album || ''}}"
-    data-name="{{item.name}}"
-    index="{{index}}"
-    operation
-    bind:tap="handleViewTap"
-    bind:operation="handleItemOperation"
-  />
-</scroll-view>
 
-<fallback-app-bar />
+  <view wx:elif="{{!songs.length}}" class="text-sm text-gray-400 text-center py-8">
+    歌单为空
+  </view>
+
+  <view wx:for="{{songs}}" wx:key="id" class="flex items-center p-2.5 border-b border-gray-100 dark:border-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
+    data-index="{{index}}" bind:tap="handleSongTap">
+    <image src="{{item.cover_url || '/assets/icon/changpian.svg'}}" class="w-10 h-10 rounded-md" mode="aspectFill" />
+    <view class="flex-1 ml-2.5 overflow-hidden">
+      <view class="text-sm font-medium truncate">{{item.title}}</view>
+      <view class="text-xs text-gray-400 truncate">{{item.artist}}</view>
+    </view>
+    <view class="w-6 h-6 flex items-center justify-center" bind:tap="handleSongOperation" data-index="{{index}}"
+      hover-class="bg-gray-200 dark:bg-gray-700 rounded-full">
+      <image src="/assets/icon/gengduo.svg" class="w-4 h-4 invert-icon" />
+    </view>
+  </view>
+
+</scroll-view>

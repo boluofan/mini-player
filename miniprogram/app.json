@@ -1,12 +1,10 @@
 {
   "pages": [
+    "pages/login/index",
     "pages/index/index",
     "pages/list/index",
-    "pages/list/playing",
     "pages/player/index",
-    "pages/setting/index",
-    "pages/setting/more",
-    "pages/schedule/index"
+    "pages/setting/index"
   ],
   "window": {
     "navigationBarBackgroundColor": "@navBgColor",

@@ -1,46 +1,56 @@
 import { makeAutoObservable } from 'mobx-miniprogram';
 import { Store } from '..';
-import { getGlobalData } from '@/miniprogram/utils';
+import { request } from '@/miniprogram/utils';
+
+const FAVORITE_PLAYLIST_ID = 1;
 
 export class FavoriteModule {
   store: Store;
-  musics: Map<string, boolean> = new Map();
+  favoriteSet: Set<number> = new Set();
 
   constructor(store: Store) {
     this.store = store;
     makeAutoObservable(this);
   }
 
-  setMusics(names: string[] = []) {
-    this.musics = new Map(names.map((name) => [name, true]));
+  async initFavorites() {
+    try {
+      const res = await request<{ songs: any[]; total: number }>({
+        url: `/api/v1/playlists/${FAVORITE_PLAYLIST_ID}/songs`,
+        data: { limit: 10000 },
+      });
+      if (res.statusCode !== 200) return;
+      const ids = (res.data.songs || []).map((s) => s.id);
+      this.favoriteSet = new Set(ids);
+    } catch {}
   }
 
-  isFavorite(name: string) {
-    return this.musics.get(name);
+  isFavorite(songId: number) {
+    return this.favoriteSet.has(songId);
   }
 
-  toggleFavorite(name: string) {
-    if (this.isFavorite(name)) {
-      this.musics.set(name, false);
-      if (this.store.feature.playlist) {
-        this.store.playlist.removeMusic('收藏', name);
-      } else {
-        this.store.sendCommand('取消收藏');
+  async toggleFavorite(songId: number) {
+    if (this.isFavorite(songId)) {
+      this.favoriteSet.delete(songId);
+      try {
+        await request({
+          url: `/api/v1/playlists/${FAVORITE_PLAYLIST_ID}/songs/${songId}`,
+          method: 'DELETE',
+        });
+      } catch {
+        this.favoriteSet.add(songId);
       }
-      const musiclist = getGlobalData('musiclist');
-      const index = musiclist['收藏']?.indexOf(name);
-      musiclist['收藏']?.splice(index, 1);
-      this.store.playlist.updatePlaylistCount('收藏', -1);
     } else {
-      this.musics.set(name, true);
-      if (this.store.feature.playlist) {
-        this.store.playlist.addMusic('收藏', name);
-      } else {
-        this.store.sendCommand('加入收藏');
+      this.favoriteSet.add(songId);
+      try {
+        await request({
+          url: `/api/v1/playlists/${FAVORITE_PLAYLIST_ID}/songs`,
+          method: 'POST',
+          data: { song_ids: [songId] },
+        });
+      } catch {
+        this.favoriteSet.delete(songId);
       }
-      const musiclist = getGlobalData('musiclist');
-      musiclist['收藏']?.push(name);
-      this.store.playlist.updatePlaylistCount('收藏', 1);
     }
   }
 }

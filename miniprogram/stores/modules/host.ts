@@ -1,14 +1,14 @@
 import { makeAutoObservable, observable, reaction } from 'mobx-miniprogram';
 import { DEFAULT_PRIMARY_COLOR, MusicPlayer, Store } from '..';
-import { getGlobalData, request } from '@/miniprogram/utils';
-import { PlayOrderType } from '@/miniprogram/types';
+import { buildResourceUrl } from '@/miniprogram/utils';
+import { PlayOrderType, Song } from '@/miniprogram/types';
 
 export class HostPlayerModule implements MusicPlayer {
   store: Store;
   stopAt: number = 0;
   speed = 1;
   volume = wx.getStorageSync('hostVolume') || 80;
-  list: string[] = [];
+  currentList: Song[] = [];
 
   bgAudioContext?: WechatMiniprogram.BackgroundAudioManager;
   innerAudioContext?: WechatMiniprogram.InnerAudioContext;
@@ -43,9 +43,7 @@ export class HostPlayerModule implements MusicPlayer {
         if (this.store.did !== 'host') return;
         wx.setStorageSync('hostMusicInfo', val);
       },
-      {
-        delay: 300,
-      },
+      { delay: 300 },
     );
   }
 
@@ -56,47 +54,39 @@ export class HostPlayerModule implements MusicPlayer {
   }
 
   async syncMusic() {
-    if (this.store.did !== 'host') {
-      return;
-    }
-    const audioContext = this.audioContext;
-    const musicInfo = wx.getStorageSync('hostMusicInfo') || {};
+    if (this.store.did !== 'host') return;
+    const ctx = this.audioContext;
+    const info = wx.getStorageSync('hostMusicInfo') || {};
     this.store.setData({
-      musicUrl: musicInfo.url,
-      musicName: musicInfo.name || '',
-      musicAlbum: musicInfo.album || '',
-      musicCover: musicInfo.cover,
-      primaryColor: musicInfo.color || DEFAULT_PRIMARY_COLOR,
-      musicLyric: musicInfo.lyric || [],
-      playOrder: musicInfo.playOrder || PlayOrderType.All,
-      ...(audioContext && {
-        status: audioContext.paused ? 'paused' : 'playing',
-        duration: audioContext.duration,
-        currentTime: audioContext.currentTime,
+      musicUrl: info.url,
+      musicName: info.name || '',
+      musicAlbum: info.album || '',
+      musicCover: info.cover,
+      primaryColor: info.color || DEFAULT_PRIMARY_COLOR,
+      musicLyric: info.lyric || [],
+      playOrder: info.order || PlayOrderType.All,
+      ...(ctx && {
+        status: ctx.paused ? 'paused' : 'playing',
+        duration: ctx.duration,
+        currentTime: ctx.currentTime,
       }),
     });
     this.store.updateCurrentTime();
   }
 
-  setList(name: string) {
-    const musiclist = getGlobalData('musiclist');
-    const list = [...(musiclist[name] || [])];
-    this.list =
-      this.store.playOrder === PlayOrderType.Rnd
-        ? list.sort(() => Math.random() - 0.5)
-        : list;
-    wx.setStorageSync('musicList', name);
-  }
-
   getMusic() {
-    return {
-      url: this.audioContext?.src,
-    };
+    return { url: this.audioContext?.src };
   }
 
-  playMusic = async (name?: string, album?: string, src?: string) => {
-    const musicName = name || this.store.musicName;
-    const musicAlbum = album || this.store.musicAlbum;
+  playMusic = async (song?: Song) => {
+    if (!song) {
+      if (this.audioContext?.src) {
+        this.store.setData({ status: 'playing' });
+        this.audioContext.play();
+        this.store.updateCurrentTime();
+      }
+      return;
+    }
 
     this.store.setData({
       status: 'loading',
@@ -104,104 +94,66 @@ export class HostPlayerModule implements MusicPlayer {
       musicUrl: undefined,
     });
 
-    if (!name && this.audioContext?.src) {
-      this.store.setData({
-        musicName,
-        musicAlbum,
-        status: 'playing',
-        currentTime: this.audioContext.currentTime,
-      });
-      this.audioContext.play();
-      this.store.updateCurrentTime();
+    const musicUrl = buildResourceUrl(song.url);
+    if (!musicUrl) {
+      wx.showToast({ title: '播放地址获取失败', icon: 'none' });
+      this.pauseMusic();
       return;
     }
 
     this.innerAudioContext?.destroy();
 
-    const getMusicUrl = async () => {
-      if (src) return src;
-      const res = await request<{
-        url: string;
-      }>({
-        url: `/musicinfo?name=${musicName}`,
-      });
-      return this.store.getResourceUrl(res.data.url || '');
-    };
-
-    const musicUrl = await getMusicUrl();
-
-    if (!musicUrl.replace(/\?.*$/, '').match(/\/music\/(.*)/)?.[1]) {
-      wx.showToast({
-        title: '播放地址获取失败',
-        icon: 'none',
-      });
-      this.pauseMusic();
-      return;
-    }
-
     this.store.setData({
-      musicName,
-      musicAlbum,
+      currentSong: song,
+      musicName: song.title,
+      musicAlbum: song.album,
+      musicCover: song.cover_url,
       musicUrl,
+      duration: song.duration,
     });
-    if (musicAlbum) this.setList(musicAlbum);
 
-    if (this.store.isM3U8) {
-      return;
-    }
+    wx.showLoading({ title: '加载中' });
 
-    wx.showLoading({
-      title: '加载中',
-    });
+    this.store.lyric.fetchLyric(song.id);
 
     if (this.store.feature.bgAudio) {
-      this.store.setData({ status: 'loading' });
-      await this.store.lyric.fetchMusicTag();
-      const bgAudioContext = wx.getBackgroundAudioManager();
-      bgAudioContext.audioType = 'music';
-      bgAudioContext.title = this.store.musicName!;
-      bgAudioContext.singer = this.store.musicAlbum!;
-      bgAudioContext.coverImgUrl = this.store.musicCover!;
-      bgAudioContext.playbackRate = this.speed;
-      bgAudioContext.src = musicUrl;
-      bgAudioContext.play();
-      bgAudioContext.onPrev(() => {
-        this.playPrevMusic();
-      });
-      bgAudioContext.onNext(() => {
-        this.playNextMusic();
-      });
-      bgAudioContext.onError(() => {
+      const ctx = wx.getBackgroundAudioManager();
+      ctx.audioType = 'music';
+      ctx.title = song.title;
+      ctx.singer = song.artist || song.album;
+      ctx.coverImgUrl = song.cover_url || '';
+      ctx.playbackRate = this.speed;
+      ctx.src = musicUrl;
+      ctx.play();
+      ctx.onPrev(() => this.playPrevMusic());
+      ctx.onNext(() => this.playNextMusic());
+      ctx.onError(() => {
         this.store.setData({ status: 'paused' });
         wx.showModal({
           title: '播放失败，是否关闭后台播放后重试',
           success: (res) => {
             if (!res.confirm) return;
             this.store.feature.setBgAudio(false);
-            this.playMusic(name, album, src);
+            this.playMusic(song);
           },
         });
       });
-      this.addCommonListener(bgAudioContext);
-      this.bgAudioContext = bgAudioContext;
+      this.addCommonListener(ctx);
+      this.bgAudioContext = ctx;
       return;
     }
 
-    this.store.lyric.fetchMusicTag();
-    const innerAudioContext = wx.createInnerAudioContext();
-    innerAudioContext.volume = this.volume / 100;
-    innerAudioContext.playbackRate = this.speed;
-    innerAudioContext.src = musicUrl;
-    innerAudioContext.play();
-    innerAudioContext.onError((err) => {
+    const ctx = wx.createInnerAudioContext();
+    ctx.volume = this.volume / 100;
+    ctx.playbackRate = this.speed;
+    ctx.src = musicUrl;
+    ctx.play();
+    ctx.onError(() => {
       this.store.setData({ status: 'paused' });
-      wx.showToast({
-        title: err.errMsg || '加载失败',
-        icon: 'none',
-      });
+      wx.showToast({ title: '加载失败', icon: 'none' });
     });
-    this.addCommonListener(innerAudioContext);
-    this.innerAudioContext = innerAudioContext;
+    this.addCommonListener(ctx);
+    this.innerAudioContext = ctx;
   };
 
   addCommonListener(
@@ -209,12 +161,9 @@ export class HostPlayerModule implements MusicPlayer {
       | WechatMiniprogram.BackgroundAudioManager
       | WechatMiniprogram.InnerAudioContext,
   ) {
-    context.onCanplay(() => {
-      wx.hideLoading();
-    });
+    context.onCanplay(() => wx.hideLoading());
     context.onPlay(() => {
-      if (this.store.did !== 'host') return;
-      if (this.store.status === 'playing') return;
+      if (this.store.did !== 'host' || this.store.status === 'playing') return;
       wx.hideLoading();
       this.store.setData({
         status: 'playing',
@@ -226,16 +175,12 @@ export class HostPlayerModule implements MusicPlayer {
     context.onPause(() => {
       if (this.store.did !== 'host') return;
       this.store.setData({ status: 'paused' });
-      if (this.store.playTimer) {
-        clearTimeout(this.store.playTimer);
-      }
+      if (this.store.playTimer) clearTimeout(this.store.playTimer);
     });
     context.onStop(() => {
       if (this.store.did !== 'host') return;
       this.store.setData({ status: 'paused' });
-      if (this.store.playTimer) {
-        clearTimeout(this.store.playTimer);
-      }
+      if (this.store.playTimer) clearTimeout(this.store.playTimer);
     });
     context.onTimeUpdate(() => {
       const duration = context.duration;
@@ -255,53 +200,47 @@ export class HostPlayerModule implements MusicPlayer {
       this.stopAt = 0;
       return;
     }
+    if (!this.currentList.length) return;
     if (this.store.playOrder === PlayOrderType.One) {
-      this.playMusic();
+      const song = this.store.currentSong;
+      if (song) this.playMusic(song);
     } else {
       this.playNextMusic();
     }
   };
 
+  private getCurrentIndex(): number {
+    const song = this.store.currentSong;
+    if (!song || !this.currentList.length) return -1;
+    return this.currentList.findIndex((s) => s.id === song.id);
+  }
+
   playPrevMusic = async () => {
-    if (!this.list.length) {
-      wx.showToast({
-        title: '暂无播放中的列表',
-        icon: 'none',
-      });
+    if (!this.currentList.length) {
+      wx.showToast({ title: '暂无播放中的列表', icon: 'none' });
       return;
     }
-    if (this.list.length === 1) {
-      this.setList(this.store.musicAlbum || '所有歌曲');
-    }
-    if (!this.store.musicName) return;
-    const index = this.list.indexOf(this.store.musicName);
-    if (index === -1) {
-      this.playMusic(this.list[0]);
+    const idx = this.getCurrentIndex();
+    if (idx < 0) {
+      this.playMusic(this.currentList[0]);
       return;
     }
-    const preIndex = index ? index - 1 : this.list.length - 1;
-    this.playMusic(this.list[preIndex]);
+    const prev = idx === 0 ? this.currentList.length - 1 : idx - 1;
+    this.playMusic(this.currentList[prev]);
   };
 
   playNextMusic = async () => {
-    if (!this.list.length) {
-      wx.showToast({
-        title: '暂无播放中的列表',
-        icon: 'none',
-      });
+    if (!this.currentList.length) {
+      wx.showToast({ title: '暂无播放中的列表', icon: 'none' });
       return;
     }
-    if (this.list.length === 1) {
-      this.setList(this.store.musicAlbum || '所有歌曲');
-    }
-    if (!this.store.musicName) return;
-    const index = this.list.indexOf(this.store.musicName);
-    if (index === -1) {
-      this.playMusic(this.list[0]);
+    const idx = this.getCurrentIndex();
+    if (idx < 0) {
+      this.playMusic(this.currentList[0]);
       return;
     }
-    const nextIndex = index === this.list.length - 1 ? 0 : index + 1;
-    this.playMusic(this.list[nextIndex]);
+    const next = idx === this.currentList.length - 1 ? 0 : idx + 1;
+    this.playMusic(this.currentList[next]);
   };
 
   pauseMusic = async () => {
@@ -311,9 +250,7 @@ export class HostPlayerModule implements MusicPlayer {
 
   seekMusic = async (time: number) => {
     this.audioContext?.seek(time);
-    this.store.setData({
-      currentTime: time,
-    });
+    this.store.setData({ currentTime: time });
     this.store.lyric.syncLyric(time);
   };
 
