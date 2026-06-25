@@ -7,6 +7,7 @@ export class MiotPlayerModule implements MusicPlayer {
   store: Store;
   speed = 1;
   volume = 20;
+  stopAt = 0;
   pollTimer: number | null = null;
   lastSyncTime = 0;
   lastSyncPosition = 0;
@@ -195,8 +196,10 @@ export class MiotPlayerModule implements MusicPlayer {
         musicCover: song?.cover_url || this.store.musicCover,
         duration: status.duration || this.store.duration,
         currentTime: status.position,
-        volume: status.volume >= 0 ? status.volume : this.store.volume,
       });
+      if (status.volume >= 0) {
+        this.volume = status.volume;
+      }
 
       if (song?.lyric_url && song.id !== this.store.currentSong?.id) {
         this.store.lyric.fetchLyric(song.id);
@@ -238,6 +241,6 @@ export class MiotPlayerModule implements MusicPlayer {
   setSpeed() {}
 
   setStopAt(minute: number) {
-    this.store.setData({ stopAt: Date.now() + minute * 60 * 1000 });
+    this.stopAt = Date.now() + minute * 60 * 1000;
   }
 }

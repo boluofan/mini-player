@@ -5,6 +5,9 @@ export default defineConfig({
   weapp: {
     srcRoot: 'miniprogram',
   },
+  build: {
+    target: 'es2015',
+  },
   plugins: [
     // @ts-ignore
     uvwt({

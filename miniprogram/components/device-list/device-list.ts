@@ -11,6 +11,10 @@ ComponentWithStore({
     handleSwitchDevice(e: any) {
       const { deviceid, gindex } = e.currentTarget.dataset;
       if (deviceid === store.did) return;
+      if (deviceid === 'host') {
+        store.switchDevice('host');
+        return;
+      }
       const group = store.deviceGroups[gindex];
       store.switchDevice(deviceid, group?.account_id);
     },

@@ -1,15 +1,23 @@
-<block wx:if="{{deviceList.length > 0}}">
-  <view class="text-base font-bold my-3">设备</view>
-  <block wx:for="{{deviceGroups}}" wx:key="account_id" wx:for-index="gIndex">
-    <block wx:for="{{item.devices}}" wx:key="deviceID">
-      <view class="flex items-center p-2.5 rounded-md mb-1 transition-colors {{item.deviceID === did ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-400/30' : 'bg-white dark:bg-gray-800/20'}}"
-        data-deviceid="{{item.deviceID}}" data-gindex="{{gIndex}}" bind:tap="handleSwitchDevice">
-        <view class="flex-1 min-w-0">
-          <view class="text-sm font-medium truncate">{{item.name}}</view>
-          <view class="text-xs text-gray-400 truncate">{{item.model || ''}}</view>
-        </view>
-        <view wx:if="{{item.deviceID === did}}" class="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+<view class="text-base font-bold my-3">设备</view>
+<!-- 本机默认设备 -->
+<view class="flex items-center p-2.5 rounded-md mb-1 transition-colors {{did === 'host' ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-400/30' : 'bg-white dark:bg-gray-800/20'}}"
+  data-deviceid="host" bind:tap="handleSwitchDevice">
+  <view class="flex-1 min-w-0">
+    <view class="text-sm font-medium truncate">本机</view>
+    <view class="text-xs text-gray-400 truncate">小程序播放</view>
+  </view>
+  <view wx:if="{{did === 'host'}}" class="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+</view>
+<!-- 远程设备列表 -->
+<block wx:for="{{deviceGroups}}" wx:key="account_id" wx:for-index="gIndex">
+  <block wx:for="{{item.devices}}" wx:key="deviceID">
+    <view class="flex items-center p-2.5 rounded-md mb-1 transition-colors {{item.deviceID === did ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-400/30' : 'bg-white dark:bg-gray-800/20'}}"
+      data-deviceid="{{item.deviceID}}" data-gindex="{{gIndex}}" bind:tap="handleSwitchDevice">
+      <view class="flex-1 min-w-0">
+        <view class="text-sm font-medium truncate">{{item.name}}</view>
+        <view class="text-xs text-gray-400 truncate">{{item.model || ''}}</view>
       </view>
-    </block>
+      <view wx:if="{{item.deviceID === did}}" class="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+    </view>
   </block>
 </block>

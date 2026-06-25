@@ -18,7 +18,7 @@
     </view>
   </search-bar>
 
-  <device-list wx:if="{{hasMiot && deviceGroups.length}}" />
+  <device-list />
 
   <view class="text-base font-bold my-3">歌单</view>
 

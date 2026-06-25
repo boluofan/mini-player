@@ -12,6 +12,7 @@ export class HostPlayerModule implements MusicPlayer {
 
   bgAudioContext?: WechatMiniprogram.BackgroundAudioManager;
   innerAudioContext?: WechatMiniprogram.InnerAudioContext;
+  private _starting = false;
 
   constructor(store: Store) {
     this.store = store;
@@ -82,6 +83,7 @@ export class HostPlayerModule implements MusicPlayer {
     if (!song) {
       if (this.audioContext?.src) {
         this.store.setData({ status: 'playing' });
+        this._starting = true;
         this.audioContext.play();
         this.store.updateCurrentTime();
       }
@@ -126,6 +128,7 @@ export class HostPlayerModule implements MusicPlayer {
       ctx.coverImgUrl = song.cover_url || '';
       ctx.playbackRate = this.speed;
       ctx.src = musicUrl;
+      this._starting = true;
       ctx.play();
       ctx.onPrev(() => this.playPrevMusic());
       ctx.onNext(() => this.playNextMusic());
@@ -149,8 +152,10 @@ export class HostPlayerModule implements MusicPlayer {
     ctx.volume = this.volume / 100;
     ctx.playbackRate = this.speed;
     ctx.src = musicUrl;
+    this._starting = true;
     ctx.play();
     ctx.onError(() => {
+      this._starting = false;
       this.store.setData({ status: 'paused' });
       wx.showToast({ title: '加载失败', icon: 'none' });
     });
@@ -165,6 +170,7 @@ export class HostPlayerModule implements MusicPlayer {
   ) {
     context.onCanplay(() => wx.hideLoading());
     context.onPlay(() => {
+      this._starting = false;
       if (this.store.did !== 'host' || this.store.status === 'playing') return;
       wx.hideLoading();
       this.store.setData({
@@ -246,7 +252,13 @@ export class HostPlayerModule implements MusicPlayer {
   };
 
   pauseMusic = async () => {
-    this.audioContext?.pause();
+    if (this._starting) {
+      this._starting = false;
+      this.innerAudioContext?.destroy();
+      this.innerAudioContext = undefined;
+    } else {
+      this.audioContext?.pause();
+    }
     this.store.setData({ status: 'paused' });
   };
 
