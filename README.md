@@ -72,6 +72,8 @@ pnpm build
 
 输出到 `dist/` 目录。
 
+> 如果使用了自托管后端（详见下方说明），构建前需在小程序项目根目录 `.env` 中配置 `VITE_CLOUD_HOSTED_SERVER=https://你的域名:7529`，这样小程序才能调用代理、刮削等增强接口。
+
 ### 4. 上传发布
 
 1. 打开微信开发者工具，导入项目**根目录**（`project.config.json` 所在目录）
@@ -81,19 +83,76 @@ pnpm build
 
 > **个人/小范围使用**：上传后，在版本管理中将该版本设为**体验版**，再将微信号加入**体验成员**即可使用，无需提交审核和发布生产。注意体验版同样受业务域名白名单限制，必须在公众平台配置好服务器域名。
 
-> 若使用自托管后端，需确保服务器**已部署且公网可达**，并在 `.env` 中正确配置 `VITE_CLOUD_HOSTED_SERVER`。详见下方自托管后端说明。
+## 自托管后端（可选）
 
-## 自托管后端
+> **此服务提供三个增强接口**：代理转发、歌曲刮削、小程序码生成。**不部署不影响小程序正常使用**，小程序的核心功能（播放、歌单、搜索等）直接连接 Songloft 服务端即可工作。
 
 项目附带简易自托管后端（`cloudfunctions/`），提供代理、歌曲刮削、小程序码生成接口：
+
+### 本地运行方式
 
 ```sh
 pnpm dev:server
 ```
 
-复制 `cloudfunctions/.env.example` 为 `cloudfunctions/.env`，填入小程序 `appid` / `appsecret` 后启动。
+### Docker 部署（推荐）
 
-生产部署建议使用 Nginx + HTTPS 反代转发到本地 7529 端口。
+项目提供 Docker 镜像，适合在 NAS 等设备上运行：
+
+```sh
+# 拉取镜像
+docker pull boluofandocker/mini-player-server:latest
+
+# 运行（通过 -e 传入配置）
+docker run -d \
+  --name mini-player-server \
+  --restart unless-stopped \
+  -p 7529:7529 \
+  -e WEAPP_APPID=你的AppID \
+  -e WEAPP_APPSECRET=你的AppSecret \
+  -e MUSIC_TAG_SERVER= \
+  -e MUSIC_TAG_USERNAME= \
+  -e MUSIC_TAG_PASSWORD= \
+  boluofandocker/mini-player-server:latest
+```
+
+或用 docker-compose（推荐）：
+
+```yaml
+version: '3'
+services:
+  mini-player-server:
+    image: boluofandocker/mini-player-server:latest
+    container_name: mini-player-server
+    restart: unless-stopped
+    ports:
+      - '7529:7529'
+    environment:
+      - WEAPP_APPID=你的AppID
+      - WEAPP_APPSECRET=你的AppSecret
+      - MUSIC_TAG_SERVER=
+      - MUSIC_TAG_USERNAME=
+      - MUSIC_TAG_PASSWORD=
+```
+
+```sh
+docker-compose up -d
+```
+
+**参数说明：**
+
+| 变量                 | 用途                                             | 必填 |
+| -------------------- | ------------------------------------------------ | ---- |
+| `WEAPP_APPID`        | 微信小程序的 AppID（小程序码生成用）             | 否   |
+| `WEAPP_APPSECRET`    | 微信小程序的 AppSecret（小程序码生成用）         | 否   |
+| `MUSIC_TAG_SERVER`   | 歌曲刮削服务地址（如 `https://api.example.com`） | 否   |
+| `MUSIC_TAG_USERNAME` | 刮削服务登录用户名                               | 否   |
+| `MUSIC_TAG_PASSWORD` | 刮削服务登录密码                                 | 否   |
+| `PORT`               | 监听端口（默认 7529）                            | 否   |
+
+> 三个接口都是可选增强功能，不配置也能正常运行，不影响小程序核心功能。
+
+生产部署建议用 Nginx + HTTPS 反代转发到 7529 端口。
 
 ## 架构
 
