@@ -1,4 +1,4 @@
-<navigation-bar title="{{playlistName}}" />
+<navigation-bar title="{{isSearch ? keyword : name}}" />
 
 <scroll-view class="flex-1 overflow-y-hidden px-3 box-border" scroll-y
   show-scrollbar="{{false}}" bind:scrolltolower="loadMore">

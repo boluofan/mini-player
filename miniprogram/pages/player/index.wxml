@@ -54,7 +54,7 @@
       <image class="w-5 h-5 opacity-60" src="/assets/icon/bofangliebiao.svg" bind:tap="handlePlayingList" />
     </view>
 
-    <view class="mt-2 pb-2 flex items-center opacity-60">
+    <view wx:if="{{did !== 'host'}}" class="mt-2 pb-2 flex items-center opacity-60">
       <slider value="{{volume}}" class="flex-1 mx-2" activeColor="#fff" backgroundColor="#fff6" block-size="{{16}}" bindchange="handleVolumeChange" />
     </view>
   </view>

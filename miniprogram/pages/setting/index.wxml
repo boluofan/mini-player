@@ -59,7 +59,10 @@
       </view>
       <view class="flex items-center py-2 border-t border-gray-100 dark:border-gray-700/50">
         <text class="text-sm text-gray-400">基于 卯卯音乐 二次开发</text>
-        <text class="text-sm ml-1 text-blue-500" data-url="https://github.com/F-loat/xiaoplayer" bind:tap="openLink">GitHub</text>
+        <text class="text-sm ml-1 text-blue-500" data-url="https://github.com/F-loat/xiaoplayer" bind:tap="openLink">卯卯音乐</text>
+      </view>
+      <view class="flex items-center justify-center py-2 border-t border-gray-100 dark:border-gray-700/50">
+        <text class="text-sm text-blue-500" data-url="https://github.com/boluofan/mini-player" bind:tap="openLink">项目地址</text>
       </view>
     </view>
   </view>

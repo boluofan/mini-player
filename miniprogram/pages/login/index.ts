@@ -94,5 +94,10 @@ ComponentWithStore({
       const { field } = e.currentTarget.dataset;
       this.setData({ [field]: e.detail.value, error: '' });
     },
+
+    openLink(e: any) {
+      const { url } = e.currentTarget.dataset;
+      wx.setClipboardData({ data: url });
+    },
   },
 });

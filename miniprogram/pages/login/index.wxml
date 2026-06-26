@@ -44,4 +44,8 @@
   <view wx:if="{{savedServerUrl}}" class="mt-3">
     <text class="text-xs text-gray-400">上次连接：{{savedServerUrl}}</text>
   </view>
+
+  <view class="mt-6 pb-8 text-center">
+    <text class="text-xs text-blue-500" data-url="https://github.com/boluofan/mini-player" bind:tap="openLink">项目地址</text>
+  </view>
 </scroll-view>

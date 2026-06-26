@@ -54,7 +54,10 @@ export class Store {
   playTimer: number | null = null;
 
   showAppBar = true;
-  version: string | null = wx.getStorageSync('serverVersion') || null;
+  version: string =
+    import.meta.env.VITE_APP_VERSION ||
+    wx.getStorageSync('serverVersion') ||
+    '0.9.0';
   hasMiot = false;
   miotAccountId: string = '';
 
@@ -145,15 +148,6 @@ export class Store {
 
   initServer = async () => {
     try {
-      const res = await request<{ version: string; git_commit?: string }>({
-        url: '/api/v1/version',
-      });
-      if (res.statusCode !== 200) return;
-
-      const version = res.data.version;
-      this.setData({ version });
-      wx.setStorageSync('serverVersion', version);
-
       await this.detectMiotPlugin();
       await this.playlist.fetchPlaylists();
     } catch (err) {

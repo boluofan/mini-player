@@ -37,7 +37,7 @@ ComponentWithStore({
   lifetimes: {
     attached() {
       const { search } = this.properties;
-      if (search !== undefined) {
+      if (search) {
         this.setData({ isSearch: true, keyword: search });
         this.searchSongs(search);
       } else {

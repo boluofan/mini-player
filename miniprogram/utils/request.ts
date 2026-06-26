@@ -169,7 +169,10 @@ export const request = <T>({
               header: res.header,
             });
           },
-          fail: reject,
+          fail: (err) => {
+            showNetworkError(err.errMsg || '');
+            reject(err);
+          },
         });
       } catch (err) {
         reject(err);
@@ -177,6 +180,22 @@ export const request = <T>({
     },
   );
 };
+
+export function showNetworkError(errMsg: string) {
+  if (errMsg === 'request:fail url not in domain list') {
+    wx.showModal({
+      title: '网络异常',
+      content: '局域网访问请确保小程序与 Songloft 服务在同一网段下',
+      showCancel: false,
+    });
+  } else if (errMsg.includes('-109')) {
+    wx.showModal({
+      title: '请求异常',
+      content: '局域网访问请确认【系统设置-隐私-本地网络】权限已授予微信',
+      showCancel: false,
+    });
+  }
+}
 
 export function getServerBaseUrl(): string {
   return getServerUrl();
