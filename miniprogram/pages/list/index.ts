@@ -36,12 +36,12 @@ ComponentWithStore({
 
   lifetimes: {
     attached() {
-      const { search } = this.properties;
-      if (search) {
+      const { id, search } = this.properties;
+      if (id) {
+        this.fetchSongs();
+      } else {
         this.setData({ isSearch: true, keyword: search });
         this.searchSongs(search);
-      } else {
-        this.fetchSongs();
       }
     },
   },

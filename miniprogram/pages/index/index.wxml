@@ -20,6 +20,15 @@
 
   <device-list />
 
+  <view class="flex items-center bg-white dark:bg-gray-800/20 rounded-xl p-3 my-3" bind:tap="handleAllSongs" hover-class="bg-gray-100 dark:bg-gray-800/40">
+    <image src="/assets/icon/suoyougequ.svg" class="w-5 h-5 invert-icon" />
+    <view class="ml-3">
+      <view class="text-sm font-medium">全部歌曲</view>
+      <view class="text-xs text-gray-400">浏览所有歌曲</view>
+    </view>
+    <image src="/assets/icon/jiantou.svg" class="w-4 h-4 ml-auto invert-icon opacity-50" />
+  </view>
+
   <view class="text-base font-bold my-3">歌单</view>
 
   <view wx:if="{{!normalPlaylists.length}}" class="text-sm text-gray-400 text-center py-8">

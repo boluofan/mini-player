@@ -44,6 +44,10 @@ ComponentWithStore({
       });
     },
 
+    handleAllSongs() {
+      wx.navigateTo({ url: '/pages/list/index?search=' });
+    },
+
     handleSearch(e: any) {
       const keyword = e.detail.value || '';
       wx.navigateTo({
