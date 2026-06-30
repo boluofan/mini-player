@@ -9,8 +9,6 @@ export class MiotPlayerModule implements MusicPlayer {
   volume = 20;
   stopAt = 0;
   pollTimer: number | null = null;
-  lastSyncTime = 0;
-  lastSyncPosition = 0;
 
   constructor(store: Store) {
     makeAutoObservable(this);
@@ -170,11 +168,10 @@ export class MiotPlayerModule implements MusicPlayer {
 
   syncMusic = async () => {
     if (this.store.did === 'host' || !this.store.hasMiot) return;
-    this.lastSyncTime = Date.now();
 
     try {
       const res = await request<PlayerStatus>({
-        url: '/api/v1/jsplugin/miot/player/status',
+        url: '/api/v1/jsplugin/miot/mina/status',
         data: {
           account_id: this.store.miotAccountId,
           device_id: this.store.did,
@@ -185,9 +182,6 @@ export class MiotPlayerModule implements MusicPlayer {
 
       const status = res.data;
       const song = status.current_song;
-
-      this.lastSyncPosition = status.position;
-      this.lastSyncTime = Date.now();
 
       this.store.setData({
         status: status.is_playing ? 'playing' : 'paused',
@@ -213,7 +207,7 @@ export class MiotPlayerModule implements MusicPlayer {
 
   private startPolling() {
     this.stopPolling();
-    this.pollTimer = setInterval(() => this.syncMusic(), 5000);
+    this.pollTimer = setInterval(() => this.syncMusic(), 1000);
   }
 
   private stopPolling() {
