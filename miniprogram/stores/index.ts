@@ -180,9 +180,15 @@ export class Store {
         url: '/api/v1/jsplugin/miot/mina/devices',
       });
       if (res.statusCode !== 200 || !res.data) return;
-      const groups: DeviceGroup[] = Array.isArray(res.data)
+      let groups: DeviceGroup[] = Array.isArray(res.data)
         ? res.data
         : res.data.groups || res.data.data || [];
+      groups = groups
+        .map((g) => ({
+          ...g,
+          devices: (g.devices || []).filter((d) => d.managed),
+        }))
+        .filter((g) => g.devices.length > 0);
       this.setData({ deviceGroups: groups });
       const allDevices = groups.reduce<DeviceInfo[]>(
         (acc, g) => acc.concat(g.devices || []),
